@@ -70,17 +70,19 @@ canvas.overlayCanvas {
 
 <div id="viewer"></div>
 
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 
-<script type="module">
+<script>
 
 window.addEventListener("error", (e) => {
     alert(e.message);
 });
 
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
 
-import * as pdfjsLib from "./pdf.mjs";
-pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.mjs";
 
 const fileInput = document.getElementById("file");
 const viewer = document.getElementById("viewer");
