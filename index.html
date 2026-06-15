@@ -74,6 +74,9 @@ canvas.overlayCanvas {
 
 <script type="module">
 
+window.addEventListener("error", (e) => {
+    alert(e.message);
+});
 
 
 import * as pdfjsLib from "./pdf.mjs";
