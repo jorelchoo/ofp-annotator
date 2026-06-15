@@ -1,0 +1,1054 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>OFP Annotation Tool</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: #f5f7fa;
+}
+
+.header {
+    padding: 20px;
+    text-align: center;
+    background: white;
+    border-bottom: 1px solid #ddd;
+}
+
+.upload {
+    display: flex;
+    justify-content: center;
+    padding: 15px;
+    background: #f9f9f9;
+    border-bottom: 1px solid #ddd;
+}
+
+#viewer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px;
+}
+
+.pageWrapper {
+    position: relative;
+    margin-bottom: 20px;
+    display: inline-block;
+    z-index: 0;
+}
+
+canvas.pdfCanvas {
+    border: 1px solid #ccc;
+    background: white;
+    position: relative;
+    z-index: 1;
+}
+
+canvas.overlayCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index:2;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
+    <h2>OFP Annotation Tool</h2>
+</div>
+
+<div class="upload">
+    <input type="file" id="file" accept="application/pdf">
+    <button id="downloadBtn">Download Annotated PDF</button>
+</div>
+
+<div id="viewer"></div>
+
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script type="module">
+
+
+
+import * as pdfjsLib from "./pdf.mjs";
+pdfjsLib.GlobalWorkerOptions.workerSrc = "./pdf.worker.mjs";
+
+const fileInput = document.getElementById("file");
+const viewer = document.getElementById("viewer");
+
+const renderedPages = [];
+
+/* -----------------------------
+   TIME DIFFERENCE (HH:MM)
+----------------------------- */
+function diffHM(dep, arr) {
+
+    const dH = parseInt(dep.slice(0,2), 10);
+    const dM = parseInt(dep.slice(2,4), 10);
+
+    const aH = parseInt(arr.slice(0,2), 10);
+    const aM = parseInt(arr.slice(2,4), 10);
+
+    let total = (aH * 60 + aM) - (dH * 60 + dM);
+
+    if (total < 0) total += 1440;
+
+    return {
+        hours: Math.floor(total / 60),
+        mins: total % 60
+    };
+}
+
+/* ----------------------------- */
+fileInput.addEventListener("change", async (e) => {
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    viewer.innerHTML = "";
+
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+    const scale = 1.5;
+
+    let sidLine = null;
+    let starLine = null;
+
+     const targetSet = new Set([
+        "004","005","006","007","008","009",
+        "010","011","012","013","014","015",
+        "016","017","018","019"
+        ]);
+
+        const results = [];
+
+        /* -----------------------------
+        SCAN PAGES 5 → 20
+        ----------------------------- */
+        for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+            const page = await pdf.getPage(p);
+            const textContent = await page.getTextContent();
+
+            const tokens = textContent.items.map(i => i.str);
+
+            for (let i = 0; i < tokens.length; i++) {
+
+                const token = tokens[i];
+
+                if (targetSet.has(token)) {
+
+                    const beforeRaw = tokens[i - 2] || null;
+
+                    results.push({
+                        page: p,
+                        before: beforeRaw ? beforeRaw.slice(0, 5) : null,
+                        match: token
+                    });
+                }
+            }
+        }
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const pg = await pdf.getPage(p);
+        const tc = await pg.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ");
+
+        if (!sidLine) {
+            const sidRaw = text.match(/SID:\s*([^\n]+)/i)?.[1]?.trim();
+
+            if (sidRaw) {
+                sidLine = sidRaw.split(/\s+/).slice(0, 3).join(" ");
+            }
+        }
+
+        if (!starLine) {
+            const starRaw = text.match(/STAR:\s*([^\n]+)/i)?.[1]?.trim();
+
+            if (starRaw) {
+                starLine = starRaw.split(/\s+/).slice(0, 3).join(" ");
+            }
+        }
+
+        if (sidLine && starLine) break;
+    }
+
+    for (let pageNum = 1; pageNum <= 2; pageNum++) {
+
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale });
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "pageWrapper";
+
+        /* PDF canvas */
+        const pdfCanvas = document.createElement("canvas");
+        const pdfCtx = pdfCanvas.getContext("2d");
+
+        pdfCanvas.className = "pdfCanvas";
+        pdfCanvas.width = viewport.width;
+        pdfCanvas.height = viewport.height;
+
+        await page.render({
+            canvasContext: pdfCtx,
+            viewport
+        }).promise;
+
+        /* overlay */
+        const overlay = document.createElement("canvas");
+        const octx = overlay.getContext("2d");
+
+        overlay.className = "overlayCanvas";
+        overlay.width = viewport.width;
+        overlay.height = viewport.height;
+
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(i => i.str).join(" ");
+
+        /* -----------------------------
+        STATE
+        ----------------------------- */
+        let depTime = null;
+        let arrTime = null;
+
+        let depPos = null;
+        let arrPos = null;
+
+        let burnTime = null;
+        let burnoffTime = null;
+
+        let altnFuelValue = null;
+        let altnFuelPos = null;
+        let altnFuelHoldValue = null;
+
+        let altnAirport = null;
+        let altnAirportPos = null;
+
+        
+    
+
+        function burnoffToMinutes(t) {
+
+            const parts = t.split(".");
+
+            const h = parseInt(parts[0] || "0", 10);
+            const m = parseInt(parts[1] || "0", 10);
+
+            return (h * 60) + m;
+        }
+
+        function diffHM(dep, arr) {
+
+            const dH = parseInt(dep.slice(0,2), 10);
+            const dM = parseInt(dep.slice(2,4), 10);
+
+            const aH = parseInt(arr.slice(0,2), 10);
+            const aM = parseInt(arr.slice(2,4), 10);
+
+            let total = (aH * 60 + aM) - (dH * 60 + dM);
+
+            if (total < 0) total += 1440;
+
+            return {
+                totalMinutes: total,
+                hours: Math.floor(total / 60),
+                mins: total % 60
+            };
+        }
+        
+        function flightToMinutes(t) {
+
+                const [h, m] = t.split(".").map(Number);
+
+                return (h * 60) + m;
+            }
+
+        function toHM(total) {
+
+            return {
+                hours: Math.floor(total / 60),
+                mins: total % 60
+            };
+        }        
+
+        function convertFuel(raw) {
+            const num = parseInt(raw, 10);
+            if (isNaN(num)) return null;
+
+            const val = num / 1000;
+            return Math.ceil(val * 10) / 10;
+        }
+
+        function sumAltFuel(val1, val2) {
+            const n1 = parseInt(val1, 10);
+            const n2 = parseInt(val2, 10);
+
+            if (isNaN(n1) || isNaN(n2)) return null;
+
+            const total = (n1 + n2) / 1000;
+            return Math.ceil(total * 10) / 10;
+        }
+
+        function convertZFW(raw) {
+            const num = parseInt(raw, 10);
+            if (isNaN(num)) return null;
+
+            const val = num / 1000;
+            return Math.ceil(val * 10) / 10;
+        }
+
+    
+
+
+        /* -----------------------------
+        LOOP TEXT
+        ----------------------------- */
+        for (let i = 0; i < textContent.items.length; i++) {
+
+            const item = textContent.items[i];
+            const str = (item.str || "");
+            const upper = str.toUpperCase();
+
+            ///PLAN NUMBER
+            if (upper.startsWith("PLAN")) {
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = str.length * 9;
+                const textHeight = 18;
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                octx.restore();
+            }
+
+            ///REGISTRATION
+            if (upper.startsWith("9V")) {
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = str.length * 9;
+                const textHeight = 18;
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                octx.restore();
+            }       
+            
+            ///Flight Number
+
+            if (upper.startsWith("SIA") && str.length < 9) {
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = str.length * 9;
+                const textHeight = 18;
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                octx.restore();
+            }
+
+            ///DEP/ARR
+            if (/^[A-Z]{3}\/[A-Z]{3}$/.test(upper)) {
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = str.length * 9;
+                const textHeight = 18;
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                octx.restore();
+            }
+
+            /* ---------------- DEP ---------------- */
+            if (upper.includes("DEP")) {
+
+                const timeMatch = str.match(/\d{4}/);
+
+                if (timeMatch) {
+
+                    depTime = timeMatch[0];
+
+                    const tx = item.transform[4] * scale;
+                    const ty = viewport.height - (item.transform[5] * scale);
+
+                    const charWidth = 9;
+                    const startX = tx + (10 * charWidth);
+                    const width = 4 * charWidth;
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(startX, ty - 10, width, 15);
+
+                    depPos = { tx, ty };
+                }
+            }
+
+            /* ---------------- ARR ---------------- */
+            if (upper.includes("ARR")) {
+
+                const timeMatch = str.match(/\d{4}/);
+
+                if (timeMatch) {
+
+                    arrTime = timeMatch[0];
+
+                    const tx = item.transform[4] * scale;
+                    const ty = viewport.height - (item.transform[5] * scale);
+
+                    const charWidth = 9;
+                    const startX = tx + (10 * charWidth);
+                    const width = 4 * charWidth;
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(startX, ty - 10, width, 15);
+
+                    arrPos = { tx, ty };
+                }
+            }
+
+            ///APD
+            if (upper.includes("APD")) {
+
+                const target = str;
+
+                if (!target) continue;
+
+                const last3 = target.slice(-3);
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = last3.length * 9;
+                const textHeight = 18;
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx + (target.length - 3) * 9, ty - 12, textWidth, textHeight);
+
+                octx.restore();
+            }
+
+            /// Flight time highlight
+            if (upper.includes("BURNOFF")) {
+
+                const valueItem = textContent.items[i + 2];
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const burnTime = valueItem.str;
+
+                // must be 12.34 format
+                if (!/^\d{2}\.\d{2}$/.test(burnTime)) continue;
+
+                // safe fallback if transform missing
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = burnTime.length * charWidth;
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx, ty - 10, width, 15);
+
+                burnoffTime = burnTime;
+            }
+
+            ///Burn-off
+            if (upper.includes("BURNOFF")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///Contingency
+            if (upper.includes("CONT")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///ALTN FUEL
+            if (upper.includes("ALTN FUEL")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///ALTN HOLD
+            if (upper.includes("ALTN HOLD")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///TAXI FUEL
+            if (upper.includes("TAXI FUEL")) {
+
+                const valueItem = textContent.items[i + 2]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///FLT PLAN REQMT
+            if (upper.includes("FLT PLAN REQMT")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///EXCESS FUEL
+            if (i < 50) continue;
+
+            if (upper.includes("EXCESS FUEL")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///FUEL IN TANKS
+            if (upper.includes("FUEL IN TANKS")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            /// RESERVES
+            if (upper.includes("ALTN FUEL")) {
+
+                const fuelItem = textContent.items[i + 4];
+
+                if (fuelItem && fuelItem.str) {
+
+                    altnFuelValue = fuelItem.str;
+
+                    const t = fuelItem.transform || item.transform;
+
+                    altnFuelPos = {
+                        tx: t[4] * scale,
+                        ty: viewport.height - (t[5] * scale)
+                    };
+                }
+            }
+            
+            ///RESERVES
+            if (upper.includes("ALTN HOLD")) {
+
+                const holdItem = textContent.items[i + 4];
+
+                if (holdItem && holdItem.str) {
+                    altnFuelHoldValue = holdItem.str;
+                }
+            }
+
+            ///ALTN AIRPORT
+            if (upper.startsWith("ALTN")) {
+
+                const token = textContent.items[i].str || "";
+
+                // match ALTN XXX (YYYY)
+                const match = token.match(/\(([^)]+)\)/);
+
+                if (match && match[1]) {
+
+                    altnAirport = match[1];
+
+                    const t = item.transform;
+
+                    altnAirportPos = {
+                        tx: t[4] * scale,
+                        ty: viewport.height - (t[5] * scale)
+                    };
+                }
+            }
+
+            /// PZFW
+            if (str.replace(/\s/g, "").toUpperCase().startsWith("PZFW")) {
+
+                // remove spaces, then isolate digits after PZFW
+                const cleaned = str.replace(/\s/g, "").toUpperCase();
+
+                const match = cleaned.match(/^PZFW(\d+)$/);
+
+                if (!match) continue;
+
+                const raw = match[1];
+
+                const num = parseInt(raw, 10);
+                if (isNaN(num)) continue;
+
+                const converted = Math.ceil((num / 1000) * 10) / 10;
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+
+                octx.fillText(converted, tx + 110, ty + 1);
+            }
+
+            ///PTOW
+            if (str.replace(/\s/g, "").toUpperCase().startsWith("PTOW")) {
+
+                // remove spaces, then isolate digits after PZFW
+                const cleaned = str.replace(/\s/g, "").toUpperCase();
+
+                const match = cleaned.match(/^PTOW(\d+)$/);
+
+                if (!match) continue;
+
+                const raw = match[1];
+
+                const num = parseInt(raw, 10);
+                if (isNaN(num)) continue;
+
+                const converted = Math.ceil((num / 1000) * 10) / 10;
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+
+                octx.fillText(converted, tx + 110, ty + 1);
+            }
+
+            ///PLWT
+            if (str.replace(/\s/g, "").toUpperCase().startsWith("PLWT")) {
+
+                // remove spaces, then isolate digits after PZFW
+                const cleaned = str.replace(/\s/g, "").toUpperCase();
+
+                const match = cleaned.match(/^PLWT(\d+)$/);
+
+                if (!match) continue;
+
+                const raw = match[1];
+
+                const num = parseInt(raw, 10);
+                if (isNaN(num)) continue;
+
+                const converted = Math.ceil((num / 1000) * 10) / 10;
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+
+                octx.fillText(converted, tx + 110, ty + 1);
+            }
+
+            ///BURN ADD/LESS
+            if (upper.includes("BURN ADD") || upper.includes("BURN LESS")) {
+
+                const targetItem = textContent.items[i + 2];
+
+                if (!targetItem || !targetItem.str) continue;
+
+                const raw = targetItem.str;
+
+                // take first 6 characters
+                const value = raw.slice(0, 6);
+
+                if (!value) continue;
+
+                const t = targetItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = value.length * 9;
+                const textHeight = 18;
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                octx.restore();
+            }
+
+            ///next
+
+        }
+
+        /* -----------------------------
+        ANNOTATION (ONCE ONLY)
+        ----------------------------- */
+        if (depTime && arrTime && arrPos) {
+
+            const diff = diffHM(depTime, arrTime);
+
+            octx.fillStyle = "blue";
+            octx.font = "14px Calibri";
+
+            octx.fillText(
+                `BLK: ${diff.hours}h ${diff.mins}m`,
+                arrPos.tx + 180,
+                arrPos.ty
+            );
+        }
+
+        /// VWS Annotation
+        if (pageNum === 1) {
+
+            octx.fillStyle = "blue";
+            octx.font = "14px Calibri";
+
+            octx.fillText("VWS:", 800, 180);
+
+            let y = 200;
+
+            for (const r of results) {
+
+                octx.fillText(
+                    `${r.before || "?"} : ${r.match}`,
+                    800,
+                    y
+                );
+
+                y += 18;
+            }
+        }
+        ///Excess block time
+        if (depTime && arrTime && burnoffTime) {
+
+            const block = diffHM(depTime, arrTime).totalMinutes;
+            const flight = burnoffToMinutes(burnoffTime);
+
+            const diff = block - flight;
+
+            const diffHours = Math.floor(diff / 60);
+            const diffMins = diff % 60;
+
+            octx.fillStyle = "blue";
+            octx.font = "14px Calibri";
+
+            octx.fillText(
+                `NET: ${diffHours}h ${diffMins}m`,
+                arrPos.tx + 180,
+                arrPos.ty + 15
+            );
+        }
+
+        //crew rest
+        if (burnoffTime) {
+
+                const flightMin = flightToMinutes(burnoffTime);
+
+                // ONLY apply rule if > 8 hours
+                if (flightMin > 480) {
+
+                    const adjusted = flightMin - 90; // subtract 1h30
+
+                    const half = Math.floor(adjusted / 2);
+                    const third = Math.floor(adjusted / 3);
+
+                    const halfHM = toHM(half);
+                    const thirdHM = toHM(third);
+
+                    octx.fillStyle = "blue";
+                    octx.font = "14px Calibri";
+
+                    octx.fillText(
+                        `DBL: ${halfHM.hours}h ${halfHM.mins}m`,
+                        700,
+                        1100
+                    );
+
+                    octx.fillText(
+                        `AUG: ${thirdHM.hours}h ${thirdHM.mins}m`,
+                        700,
+                        1115
+                    );
+                }
+            }
+
+
+        ///Reserves
+        if (altnFuelValue && altnFuelHoldValue && altnFuelPos) {
+
+            const result = sumAltFuel(altnFuelValue, altnFuelHoldValue);
+
+            if (result !== null) {
+
+                octx.fillStyle = "blue";
+                octx.font = "14px Calibri";
+
+                octx.fillText(
+                    `> ${result} ${altnAirport}`,
+                    altnFuelPos.tx + 90,
+                    altnFuelPos.ty + 5
+                );
+            }
+        }
+
+        ///SIDSTAR
+        if (pageNum === 1) {
+            octx.fillStyle = "blue";
+            octx.font = "14px Calibri";
+
+            octx.fillText(
+                `DEP: ${sidLine || "Not found"}`,
+                700,
+                43
+            );
+
+            octx.fillText(
+                `ARR: ${starLine || "Not found"}`,
+                700,
+                58
+            );
+        }
+
+        /// END
+        wrapper.appendChild(pdfCanvas);
+        wrapper.appendChild(overlay);
+        viewer.appendChild(wrapper);
+
+        renderedPages.push({
+            pdfCanvas,
+            overlay
+        });
+    }
+});
+
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+
+    if (renderedPages.length < 2) {
+        alert("Load an OFP first.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+
+    const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [
+            renderedPages[0].pdfCanvas.width,
+            renderedPages[0].pdfCanvas.height
+        ]
+    });
+
+    for (let p = 0; p < Math.min(2, renderedPages.length); p++) {
+
+        const page = renderedPages[p];
+
+        const merged = document.createElement("canvas");
+        merged.width = page.pdfCanvas.width;
+        merged.height = page.pdfCanvas.height;
+
+        const ctx = merged.getContext("2d");
+
+        ctx.drawImage(page.pdfCanvas, 0, 0);
+        ctx.drawImage(page.overlay, 0, 0);
+
+        const img = merged.toDataURL("image/jpeg", 1.0);
+
+        if (p > 0) {
+            pdf.addPage(
+                [merged.width, merged.height],
+                merged.width > merged.height ? "landscape" : "portrait"
+            );
+        }
+
+        pdf.addImage(
+            img,
+            "JPEG",
+            0,
+            0,
+            merged.width,
+            merged.height
+        );
+    }
+
+    pdf.save("Annotated_OFP.pdf");
+});
+
+</script>
+
+</body>
+</html>
