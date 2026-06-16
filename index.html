@@ -161,6 +161,39 @@ fileInput.addEventListener("change", async (e) => {
             }
         }
 
+    let codeList = [];
+
+    codeList = [];
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ");
+
+        const wordList = text.split(/\s+/);
+
+        for (let i = 0; i < wordList.length; i++) {
+
+            const item = wordList[i];
+
+            const valid =
+                item.length === 8 &&
+                item[3] === "*" &&
+                /^\d{3}$/.test(item.slice(0, 3));
+
+            if (valid) {
+                codeList.push({
+                    code: item.slice(0, 4),
+                    before16: wordList[i - 16] || null,
+                    before17: wordList[i - 17] || null
+                });
+            }
+        }
+    }
+
+
     for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
 
         const pg = await pdf.getPage(p);
@@ -186,6 +219,202 @@ fileInput.addEventListener("change", async (e) => {
 
         if (sidLine && starLine) break;
     }
+
+    ///RTOW extraction
+    let rtow = null;
+
+    for (let p = 2; p <= Math.min(4, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ");
+
+        const rtowMatch = text.match(/RTOW\s*(?!\()[^\d]*(\d{6})/i);
+
+        if (rtowMatch) {
+            rtow = (Math.floor(Number(rtowMatch[1]) / 100) * 100) / 1000;
+            break; // stop once found
+        }
+    }
+
+    ///CLB SCHEDULE
+    const matches = [];
+    const seenCodes = new Set();
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const tokens = tc.items.map(i => i.str);
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const token = tokens[i];
+
+            const m = token.match(/\b(\d{3})\s*\.\.\./);
+
+            if (!m) continue;
+
+            const code = m[1];
+
+            // 🔥 filter: first digit must be 2, 3, or 4
+            if (!/^[234]/.test(code)) continue;
+
+            // 🔥 only first occurrence
+            if (seenCodes.has(code)) continue;
+            seenCodes.add(code);
+
+            const before5 = tokens[i - 5];
+            if (!before5) continue;
+
+            matches.push({
+                page: p,
+                code,
+                value: before5.slice(0, 5)
+            });
+        }
+    }
+
+    ///EDTO INFORMATION
+    let edtoPage = null;
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items
+            .map(i => i.str)
+            .join(" ")
+            .toUpperCase();
+
+        if (text.includes("EDTO INFORMATION")) {
+            edtoPage = p;
+            break;
+        }
+    }
+
+    // EDTO EXTRACTION (FULL BLOCK)
+    let edtoGroups = [];
+
+    function isTime(t) {
+        const cleaned = (t || "").replace(/\s+/g, "");
+        return /^\d{1,2}\.\d{2}$/.test(cleaned);
+    }
+
+    // matches "VOMM 31", "WSSS", etc.
+    function isAirport(t) {
+        return /^[A-Z]{4}(\s*\d+)?$/.test(t);
+    }
+
+    // extracts clean ICAO code only
+    function cleanAirport(t) {
+        return (t.match(/^[A-Z]{4}/) || [null])[0];
+    }
+
+    // scan only EDTO page + next page
+    const startPage = edtoPage;
+    const endPage = Math.min(edtoPage + 1, pdf.numPages);
+
+    for (let p = startPage; p <= endPage; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const tokens = tc.items.map(i => (i.str || "").trim());
+
+        let lastTime = null;
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const t = tokens[i];
+
+            // track latest valid time
+            if (isTime(t)) {
+                lastTime = t.replace(/\s+/g, "");
+            }
+
+            // =========================
+            // ENTRY
+            // =========================
+            if (t.includes("ENTRY")) {
+
+                let airport1 = null;
+                let airport2 = null;
+                let airport3 = null;
+                let airport4 = null;
+
+                let start = lastTime;
+                let end = null;
+
+                // airport1 = last airport before ENTRY
+                for (let j = i - 1; j >= 0; j--) {
+                    if (isAirport(tokens[j])) {
+                        airport1 = cleanAirport(tokens[j]);
+                        break;
+                    }
+                }
+
+                // =========================
+                // scan forward until EXIT
+                // =========================
+                let foundAfterEntry = [];
+
+                for (let k = i + 1; k < tokens.length; k++) {
+
+                    const tk = tokens[k];
+
+                    // EXIT → close group
+                    if (tk.includes("EXIT")) {
+
+                        // STEP 1: find LAST valid timing BEFORE EXIT (robust, not state-dependent)
+                        let exitEnd = null;
+
+                        for (let j = k - 1; j >= 0; j--) {
+                            const candidate = tokens[j];
+
+                            if (isTime(candidate)) {
+                                exitEnd = candidate.replace(/\s+/g, "");
+                                break;
+                            }
+                        }
+
+                        end = exitEnd;
+
+                        // STEP 2: airport4 = last airport before EXIT
+                        for (let j = k - 1; j >= 0; j--) {
+                            if (isAirport(tokens[j])) {
+                                airport4 = cleanAirport(tokens[j]);
+                                break;
+                            }
+                        }
+
+                        break;
+                    }
+
+                    // collect airports after ENTRY
+                    if (isAirport(tk)) {
+                        foundAfterEntry.push(cleanAirport(tk));
+                    }
+                }
+
+                airport2 = foundAfterEntry[0] || null;
+                airport3 = foundAfterEntry[1] || null;
+
+                edtoGroups.push({
+                    airport1,
+                    airport2,
+                    airport3,
+                    airport4,
+                    start,
+                    end
+                });
+            }
+        }
+    }
+
+
+
 
     for (let pageNum = 1; pageNum <= 2; pageNum++) {
 
@@ -238,8 +467,15 @@ fileInput.addEventListener("change", async (e) => {
         let altnAirport = null;
         let altnAirportPos = null;
 
-        
+        let ptow = null;
+
+        let afterRteNo = false;
+        let captFound = false;
     
+        function calcExcess(rtow, ptow) {
+            if (rtow == null || ptow == null) return null;
+            return Math.round((rtow - ptow) * 10) / 10;
+        }
 
         function burnoffToMinutes(t) {
 
@@ -323,81 +559,135 @@ fileInput.addEventListener("change", async (e) => {
             const str = (item.str || "");
             const upper = str.toUpperCase();
 
-            ///PLAN NUMBER
-            if (upper.startsWith("PLAN")) {
-
-                const t = item.transform;
-
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
-
-                const textWidth = str.length * 9;
-                const textHeight = 18;
-
-                octx.save();
-
-                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                octx.fillRect(tx, ty - 12, textWidth, textHeight);
-
-                octx.restore();
+            if (upper.includes("RTE NO")) {
+                afterRteNo = true;
+                captFound = false; // reset per page
+                continue;
             }
+
+            ///PLAN NUMBER
+            if (pageNum === 1) {
+                if (upper.startsWith("PLAN")) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                    octx.restore();
+                }
+            }
+            ///AIRCRAFT TYPE + CAPTAIN
+            if (pageNum === 1 && afterRteNo && !captFound) {
+
+                if (upper.includes("CAPT")) {
+
+                    captFound = true;
+
+                    const t = item.transform;
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    // -------------------------
+                    // highlight CAPT
+                    // -------------------------
+                    octx.save();
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+                    octx.restore();
+
+                    // -------------------------
+                    // highlight aircraft type (previous token)
+                    // -------------------------
+                    const prev = textContent.items[i - 2];
+
+                    if (prev && prev.str) {
+                        const pt = prev.transform;
+
+                        const ptx = pt[4] * scale;
+                        const pty = viewport.height - (pt[5] * scale);
+
+                        const pwidth = prev.str.length * 9;
+
+                        octx.save();
+                        octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                        octx.fillRect(ptx, pty - 12, pwidth, 18);
+                        octx.restore();
+                    }
+                }
+            }
+
 
             ///REGISTRATION
-            if (upper.startsWith("9V")) {
+            if (pageNum === 1) {
+                if (upper.startsWith("9V")) {
 
-                const t = item.transform;
+                    const t = item.transform;
 
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
 
-                const textWidth = str.length * 9;
-                const textHeight = 18;
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
 
-                octx.save();
+                    octx.save();
 
-                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
 
-                octx.restore();
-            }       
-            
-            ///Flight Number
-
-            if (upper.startsWith("SIA") && str.length < 9) {
-
-                const t = item.transform;
-
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
-
-                const textWidth = str.length * 9;
-                const textHeight = 18;
-
-                octx.save();
-
-                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                octx.fillRect(tx, ty - 12, textWidth, textHeight);
-
-                octx.restore();
+                    octx.restore();
+                }       
             }
+            ///Flight Number
+            if (pageNum === 1) {
+                if (upper.startsWith("SIA") && str.length < 9) {
 
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                    octx.restore();
+                }
+            }
             ///DEP/ARR
-            if (/^[A-Z]{3}\/[A-Z]{3}$/.test(upper)) {
+            if (pageNum === 1) {
+                if (/^[A-Z]{3}\/[A-Z]{3}$/.test(upper)) {
 
-                const t = item.transform;
+                    const t = item.transform;
 
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
 
-                const textWidth = str.length * 9;
-                const textHeight = 18;
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
 
-                octx.save();
+                    octx.save();
 
-                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
 
-                octx.restore();
+                    octx.restore();
+                }
             }
 
             /* ---------------- DEP ---------------- */
@@ -785,6 +1075,7 @@ fileInput.addEventListener("change", async (e) => {
                 if (isNaN(num)) continue;
 
                 const converted = Math.ceil((num / 1000) * 10) / 10;
+                ptow = converted;
 
                 const t = item.transform;
 
@@ -823,6 +1114,33 @@ fileInput.addEventListener("change", async (e) => {
                 octx.font = "14px Calibri";
 
                 octx.fillText(converted, tx + 110, ty + 1);
+                
+                if (rtow !== null) {
+
+                    octx.fillStyle = "blue";
+                    octx.font = "14px Calibri";
+
+                    octx.fillText(
+                        `RTOW ${rtow}`,
+                        tx + 72,
+                        ty + 18 // slightly below PLWT line
+                    );
+                }
+
+                const excess = calcExcess(rtow, ptow);
+
+                if (excess !== null) {
+
+                    octx.fillStyle = "blue";
+                    octx.font = "14px Calibri";
+
+                    octx.fillText(
+                        `EXCESS  ${excess}`,
+                        tx + 71,
+                        ty + 32
+                    );
+                }
+
             }
 
             ///BURN ADD/LESS
@@ -882,9 +1200,9 @@ fileInput.addEventListener("change", async (e) => {
             octx.fillStyle = "blue";
             octx.font = "14px Calibri";
 
-            octx.fillText("VWS:", 800, 180);
+            octx.fillText("VWS:", 800, 145);
 
-            let y = 200;
+            let y = 160;
 
             for (const r of results) {
 
@@ -894,6 +1212,15 @@ fileInput.addEventListener("change", async (e) => {
                     y
                 );
 
+                y += 18;
+            }
+
+            y += 20
+            octx.fillText("CLB SCHED:", 800, y);
+
+            y += 15
+            for (const m of matches) {
+                octx.fillText(`${m.code}:   ${m.value}`, 800, y);
                 y += 18;
             }
         }
@@ -987,6 +1314,57 @@ fileInput.addEventListener("change", async (e) => {
                 58
             );
         }
+
+        ///HIGH GROUND
+        if (pageNum === 1) {
+            octx.fillStyle = "blue";
+            octx.font = "14px Calibri";
+
+            octx.fillText("HIGH GROUND:", 650, 145);
+
+            let y = 160;
+
+            for (const c of codeList) {
+
+                octx.fillText(
+                    `${c.before16 || "?"} | ${c.code} | ${c.before17 || "?"}`,
+                    650,
+                    y
+                );
+
+                y += 18;
+            }
+
+        }
+
+        ///EDTO INFO
+        if (pageNum === 1 && edtoGroups.length > 0) {
+
+            octx.fillStyle = "blue";
+            octx.font = "14px Calibri";
+
+            let y = 145;
+
+            for (const g of edtoGroups) {
+
+                octx.fillText("EDTO:", 5, y);
+                y += 15;
+
+                octx.fillText(`A1: ${g.airport1 || "-"}`, 5, y); y += 15;
+                octx.fillText(`${g.start || "-"}`, 5, y); y += 15;
+                octx.fillText(`A2: ${g.airport2 || "-"}`, 5, y); y += 15;
+                octx.fillText(`A3: ${g.airport3 || "-"}`, 5, y); y += 15;
+                octx.fillText(`${g.end || "-"}`, 5, y); y += 15;
+                octx.fillText(`A4: ${g.airport4 || "-"}`, 5, y); y += 25;
+            }
+        }
+
+
+
+
+
+
+
 
         /// END
         wrapper.appendChild(pdfCanvas);
