@@ -1523,6 +1523,7 @@ function diffHM(dep, arr) {
     };
 }
 
+
 /* ----------------------------- */
 fileInput.addEventListener("change", async (e) => {
 
@@ -1538,6 +1539,8 @@ fileInput.addEventListener("change", async (e) => {
 
     let sidLine = null;
     let starLine = null;
+
+    
 
     ///VWS extraction
     const targetSet = new Set([
@@ -1691,7 +1694,9 @@ fileInput.addEventListener("change", async (e) => {
     
     ///EDTO INFORMATION
     let edtoPage = null;
+    let edtoGroups = [];
 
+    // STEP 1: FIND PAGE FIRST (NO RESET INSIDE LOOP)
     for (let p = 1; p <= pdf.numPages; p++) {
 
         const page = await pdf.getPage(p);
@@ -1708,124 +1713,114 @@ fileInput.addEventListener("change", async (e) => {
         }
     }
 
-    // EDTO EXTRACTION (FULL BLOCK)
-    let edtoGroups = [];
+    // STEP 2: HARD GUARD (ONLY ONCE)
+    if (!edtoPage) {
+        console.log("No EDTO section found");
+        window.edtoGroups = [];
+    } else {
 
-    function isTime(t) {
-        const cleaned = (t || "").replace(/\s+/g, "");
-        return /^\d{1,2}\.\d{2}$/.test(cleaned);
-    }
+        function isEDTOTime(t) {
+            const cleaned = (t || "").replace(/\s+/g, "");
+            return /^\d{1,2}\.\d{2}$/.test(cleaned);
+        }
 
-    // matches "VOMM 31", "WSSS", etc.
-    function isAirport(t) {
-        return /^[A-Z]{4}(\s*\d+)?$/.test(t);
-    }
+        function isAirport(t) {
+            return /^[A-Z]{4}(\s*\d+)?$/.test(t);
+        }
 
-    // extracts clean ICAO code only
-    function cleanAirport(t) {
-        return (t.match(/^[A-Z]{4}/) || [null])[0];
-    }
+        function cleanAirport(t) {
+            return (t.match(/^[A-Z]{4}/) || [null])[0];
+        }
 
-    // scan only EDTO page + next page
-    const startPage = edtoPage;
-    const endPage = Math.min(edtoPage + 1, pdf.numPages);
+        const startPage = edtoPage;
+        const endPage = Math.min(edtoPage + 1, pdf.numPages);
 
-    for (let p = startPage; p <= endPage; p++) {
+        edtoGroups = []; // reset ONCE here only
 
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        const tokens = tc.items.map(i => (i.str || "").trim());
+        for (let p = startPage; p <= endPage; p++) {
 
-        let lastTime = null;
+            const page = await pdf.getPage(p);
+            const tc = await page.getTextContent();
+            const tokens = tc.items.map(i => (i.str || "").trim());
 
-        for (let i = 0; i < tokens.length; i++) {
+            let lastTime = null;
 
-            const t = tokens[i];
+            for (let i = 0; i < tokens.length; i++) {
 
-            // track latest valid time
-            if (isTime(t)) {
-                lastTime = t.replace(/\s+/g, "");
-            }
+                const t = tokens[i];
 
-            // =========================
-            // ENTRY
-            // =========================
-            if (t.includes("ENTRY")) {
-
-                let airport1 = null;
-                let airport2 = null;
-                let airport3 = null;
-                let airport4 = null;
-
-                let start = lastTime;
-                let end = null;
-
-                // airport1 = last airport before ENTRY
-                for (let j = i - 1; j >= 0; j--) {
-                    if (isAirport(tokens[j])) {
-                        airport1 = cleanAirport(tokens[j]);
-                        break;
-                    }
+                if (isEDTOTime(t)) {
+                    lastTime = t.replace(/\s+/g, "");
                 }
 
-                // =========================
-                // scan forward until EXIT
-                // =========================
-                let foundAfterEntry = [];
+                if (t.includes("ENTRY")) {
 
-                for (let k = i + 1; k < tokens.length; k++) {
+                    let airport1 = null;
+                    let airport2 = null;
+                    let airport3 = null;
+                    let airport4 = null;
 
-                    const tk = tokens[k];
+                    let start = lastTime;
+                    let end = null;
 
-                    // EXIT → close group
-                    if (tk.includes("EXIT")) {
-
-                        // STEP 1: find LAST valid timing BEFORE EXIT (robust, not state-dependent)
-                        let exitEnd = null;
-
-                        for (let j = k - 1; j >= 0; j--) {
-                            const candidate = tokens[j];
-
-                            if (isTime(candidate)) {
-                                exitEnd = candidate.replace(/\s+/g, "");
-                                break;
-                            }
+                    for (let j = i - 1; j >= 0; j--) {
+                        if (isAirport(tokens[j])) {
+                            airport1 = cleanAirport(tokens[j]);
+                            break;
                         }
-
-                        end = exitEnd;
-
-                        // STEP 2: airport4 = last airport before EXIT
-                        for (let j = k - 1; j >= 0; j--) {
-                            if (isAirport(tokens[j])) {
-                                airport4 = cleanAirport(tokens[j]);
-                                break;
-                            }
-                        }
-
-                        break;
                     }
 
-                    // collect airports after ENTRY
-                    if (isAirport(tk)) {
-                        foundAfterEntry.push(cleanAirport(tk));
+                    let foundAfterEntry = [];
+
+                    for (let k = i + 1; k < tokens.length; k++) {
+
+                        const tk = tokens[k];
+
+                        if (tk.includes("EXIT")) {
+
+                            let exitEnd = null;
+
+                            for (let j = k - 1; j >= 0; j--) {
+                                if (isEDTOTime(tokens[j])) {
+                                    exitEnd = tokens[j].replace(/\s+/g, "");
+                                    break;
+                                }
+                            }
+
+                            end = exitEnd;
+
+                            for (let j = k - 1; j >= 0; j--) {
+                                if (isAirport(tokens[j])) {
+                                    airport4 = cleanAirport(tokens[j]);
+                                    break;
+                                }
+                            }
+
+                            break;
+                        }
+
+                        if (isAirport(tk)) {
+                            foundAfterEntry.push(cleanAirport(tk));
+                        }
                     }
+
+                    airport2 = foundAfterEntry[0] || null;
+                    airport3 = foundAfterEntry[1] || null;
+
+                    edtoGroups.push({
+                        airport1,
+                        airport2,
+                        airport3,
+                        airport4,
+                        start,
+                        end
+                    });
                 }
-
-                airport2 = foundAfterEntry[0] || null;
-                airport3 = foundAfterEntry[1] || null;
-
-                edtoGroups.push({
-                    airport1,
-                    airport2,
-                    airport3,
-                    airport4,
-                    start,
-                    end
-                });
             }
         }
-    }
 
+        window.edtoGroups = edtoGroups;
+    }
 
     ///FIRs
     const resultsFIR = [];
@@ -1898,7 +1893,7 @@ fileInput.addEventListener("change", async (e) => {
 
                 const check = tokens[i + 2] || "";
 
-                if (!isTime(check)) continue;
+                if (!isFIRTime(check)) continue;
 
                 const timeToken = tokens[i + 4] || "";
                 const time = cleanTime(timeToken);
