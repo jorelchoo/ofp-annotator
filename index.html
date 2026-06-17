@@ -76,6 +76,1395 @@ canvas.overlayCanvas {
 
 <script>
 
+///FIR DATABASE
+const FIR_DATA = [
+  {
+    "fir": "AGGG",
+    "name": "Honiara",
+    "country": "Solomon Islands"
+  },
+  {
+    "fir": "ANAU",
+    "name": "Nauru",
+    "country": "Nauru"
+  },
+  {
+    "fir": "AYPM",
+    "name": "Port Moresby",
+    "country": "Papua New Guinea"
+  },
+  {
+    "fir": "BGGL",
+    "name": "Nuuk",
+    "country": "Greenland ( Denmark)"
+  },
+  {
+    "fir": "BIRD",
+    "name": "Reykjavík",
+    "country": "Iceland"
+  },
+  {
+    "fir": "CZEG",
+    "name": "Edmonton",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZQM",
+    "name": "Moncton",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZQX",
+    "name": "Gander",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZQX",
+    "name": "Gander Oceanic",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZUL",
+    "name": "Montreal",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZVR",
+    "name": "Vancouver",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZWG",
+    "name": "Winnipeg",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZYZ",
+    "name": "Toronto",
+    "country": "Canada"
+  },
+  {
+    "fir": "DAAA",
+    "name": "Alger",
+    "country": "Algeria"
+  },
+  {
+    "fir": "DGAC",
+    "name": "Accra",
+    "country": "Benin/ Ghana/ Togo"
+  },
+  {
+    "fir": "DIII",
+    "name": "Dakar",
+    "country": "Ivory Coast"
+  },
+  {
+    "fir": "DNKK",
+    "name": "Kano",
+    "country": "Nigeria"
+  },
+  {
+    "fir": "DRRR",
+    "name": "Niamey",
+    "country": "Benin/ Burkina Faso/ Mali/ Niger"
+  },
+  {
+    "fir": "DTTC",
+    "name": "Tunis",
+    "country": "Tunisia"
+  },
+  {
+    "fir": "EBBU",
+    "name": "Bruxelles",
+    "country": "Belgium/ Luxembourg"
+  },
+  {
+    "fir": "EBUR",
+    "name": "Maastricht",
+    "country": "Belgium/ Luxembourg"
+  },
+  {
+    "fir": "EDGG",
+    "name": "Langen",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDMM",
+    "name": "München",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDUU",
+    "name": "Rhein UIR",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDVV",
+    "name": "Maastricht",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDWW",
+    "name": "Bremen",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDYY",
+    "name": "IFPZ (Eurocontrol)",
+    "country": "Belgium/ Germany/ Netherlands"
+  },
+  {
+    "fir": "EETT",
+    "name": "Tallinn",
+    "country": "Estonia"
+  },
+  {
+    "fir": "EFIN",
+    "name": "Finland",
+    "country": "Finland"
+  },
+  {
+    "fir": "EGGX",
+    "name": "Shanwick Oceanic",
+    "country": "United Kingdom/ Ireland"
+  },
+  {
+    "fir": "EGPX",
+    "name": "Scottish",
+    "country": "United Kingdom"
+  },
+  {
+    "fir": "EGQQ",
+    "name": "Scottish",
+    "country": "United Kingdom"
+  },
+  {
+    "fir": "EGTT",
+    "name": "London",
+    "country": "United Kingdom"
+  },
+  {
+    "fir": "EHAA",
+    "name": "Amsterdam",
+    "country": "Netherlands"
+  },
+  {
+    "fir": "EISN",
+    "name": "Shannon",
+    "country": "Ireland"
+  },
+  {
+    "fir": "EKDK",
+    "name": "København",
+    "country": "Denmark"
+  },
+  {
+    "fir": "ENOB",
+    "name": "Bodo",
+    "country": "Norway"
+  },
+  {
+    "fir": "ENOR",
+    "name": "Norway",
+    "country": "Norway"
+  },
+  {
+    "fir": "EPWW",
+    "name": "Warsawa",
+    "country": "Poland"
+  },
+  {
+    "fir": "ESAA",
+    "name": "Sweden",
+    "country": "Sweden"
+  },
+  {
+    "fir": "ESMM",
+    "name": "Sweden",
+    "country": "Sweden"
+  },
+  {
+    "fir": "EVRR",
+    "name": "Riga",
+    "country": "Latvia"
+  },
+  {
+    "fir": "EYVL",
+    "name": "Vilnius",
+    "country": "Lithuania"
+  },
+  {
+    "fir": "FACA",
+    "name": "Capetown",
+    "country": "South Africa"
+  },
+  {
+    "fir": "FAJO",
+    "name": "Johannesburg Oceanic",
+    "country": "South Africa"
+  },
+  {
+    "fir": "FAJA",
+    "name": "Johannesburg",
+    "country": "Lesotho/ South Africa/ Swaziland"
+  },
+  {
+    "fir": "FBGR",
+    "name": "Gaborone",
+    "country": "Botswana"
+  },
+  {
+    "fir": "FCCC",
+    "name": "Brazzaville",
+    "country": "Cameroon/ Central African Republic/ Congo/ Equatorial Guinea/ Gabon/ Sao Tome and Principe"
+  },
+  {
+    "fir": "FIMM",
+    "name": "Mauritius",
+    "country": "Mauritius"
+  },
+  {
+    "fir": "FLFI",
+    "name": "Zambia",
+    "country": "Zambia"
+  },
+  {
+    "fir": "FMMM",
+    "name": "Antananarivo",
+    "country": "Madagascar"
+  },
+  {
+    "fir": "FNAN",
+    "name": "Luanda",
+    "country": "Angola"
+  },
+  {
+    "fir": "FOOO",
+    "name": "Libreville",
+    "country": "Gabon"
+  },
+  {
+    "fir": "FQBE",
+    "name": "Beira",
+    "country": "Mozambique"
+  },
+  {
+    "fir": "FSSS",
+    "name": "Seychelles",
+    "country": "Seychelles"
+  },
+  {
+    "fir": "FTTT",
+    "name": "N'Djamena",
+    "country": "Cameroon/ Central African Republic/ Chad"
+  },
+  {
+    "fir": "FVHF",
+    "name": "Harare",
+    "country": "Zimbabwe"
+  },
+  {
+    "fir": "FWLL",
+    "name": "Lilongwe",
+    "country": "Malawi"
+  },
+  {
+    "fir": "FYWF",
+    "name": "Windhoek",
+    "country": "Namibia"
+  },
+  {
+    "fir": "FZZA",
+    "name": "Kinshasa",
+    "country": "Congo, Democratic Republic of the"
+  },
+  {
+    "fir": "GCCC",
+    "name": "Canarias",
+    "country": "Canary Islands ( Spain)/ Western Sahara"
+  },
+  {
+    "fir": "GLRB",
+    "name": "Roberts",
+    "country": "Guinea/ Liberia/ Sierra Leone"
+  },
+  {
+    "fir": "GMMM",
+    "name": "Casablanca",
+    "country": "Morocco"
+  },
+  {
+    "fir": "GOOO",
+    "name": "Dakar",
+    "country": "Ivory Coast/ Gambia/ Mali/ Mauritania/ Senegal"
+  },
+  {
+    "fir": "GVSC",
+    "name": "Sal Oceanic",
+    "country": "Cape Verde"
+  },
+  {
+    "fir": "HAAA",
+    "name": "Addis Ababa",
+    "country": "Ethiopia"
+  },
+  {
+    "fir": "HBBA",
+    "name": "Bujumbura",
+    "country": "Burundi"
+  },
+  {
+    "fir": "HCSM",
+    "name": "Mogadishu",
+    "country": "Somalia"
+  },
+  {
+    "fir": "HECC",
+    "name": "Cairo",
+    "country": "Egypt"
+  },
+  {
+    "fir": "HHAA",
+    "name": "Asmara",
+    "country": "Eritrea"
+  },
+  {
+    "fir": "HKNA",
+    "name": "Nairobi",
+    "country": "Kenya"
+  },
+  {
+    "fir": "HLLL",
+    "name": "Tripoli",
+    "country": "Libya"
+  },
+  {
+    "fir": "HRYR",
+    "name": "Kigali",
+    "country": "Rwanda"
+  },
+  {
+    "fir": "HSSX",
+    "name": "Khartoum",
+    "country": "Sudan"
+  },
+  {
+    "fir": "HTDC",
+    "name": "Dar es-Salaam",
+    "country": "Tanzania"
+  },
+  {
+    "fir": "HUEC",
+    "name": "Entebbe",
+    "country": "Uganda"
+  },
+  {
+    "fir": "IFPS",
+    "name": "IFPZ (Eurocontrol)",
+    "country": "Eurocontrol"
+  },
+  {
+    "fir": "KZAB",
+    "name": "Albuquerque",
+    "country": "United States"
+  },
+  {
+    "fir": "KZAK",
+    "name": "Oakland Oceanic",
+    "country": "Micronesia/ Marshall Islands/ Palau/ United States"
+  },
+  {
+    "fir": "KZAU",
+    "name": "Chicago",
+    "country": "United States"
+  },
+  {
+    "fir": "KZBW",
+    "name": "Boston",
+    "country": "United States"
+  },
+  {
+    "fir": "KZDC",
+    "name": "Washington",
+    "country": "United States"
+  },
+  {
+    "fir": "KZDV",
+    "name": "Denver",
+    "country": "United States"
+  },
+  {
+    "fir": "KZFW",
+    "name": "Fort Worth",
+    "country": "United States"
+  },
+  {
+    "fir": "KZHU",
+    "name": "Houston",
+    "country": "United States"
+  },
+  {
+    "fir": "KZHU",
+    "name": "Houston Oceanic",
+    "country": "United States"
+  },
+  {
+    "fir": "KZID",
+    "name": "Indianapolis",
+    "country": "United States"
+  },
+  {
+    "fir": "KZJX",
+    "name": "Jacksonville",
+    "country": "United States"
+  },
+  {
+    "fir": "KZKC",
+    "name": "Kansas City",
+    "country": "United States"
+  },
+  {
+    "fir": "KZLA",
+    "name": "Los Angeles",
+    "country": "United States"
+  },
+  {
+    "fir": "KZLC",
+    "name": "Salt Lake",
+    "country": "United States"
+  },
+  {
+    "fir": "KZMA",
+    "name": "Miami",
+    "country": "United States"
+  },
+  {
+    "fir": "KZMA",
+    "name": "Miami Oceanic",
+    "country": "Turks and Caicos ( United Kingdom)/ United States"
+  },
+  {
+    "fir": "KZME",
+    "name": "Memphis",
+    "country": "United States"
+  },
+  {
+    "fir": "KZMP",
+    "name": "Minneapolis",
+    "country": "United States"
+  },
+  {
+    "fir": "KZNY",
+    "name": "New York",
+    "country": "United States"
+  },
+  {
+    "fir": "KZOA",
+    "name": "Oakland (En route)",
+    "country": "United States"
+  },
+  {
+    "fir": "KZOB",
+    "name": "Cleveland",
+    "country": "United States"
+  },
+  {
+    "fir": "KZSE",
+    "name": "Seattle",
+    "country": "United States"
+  },
+  {
+    "fir": "KZTL",
+    "name": "Atlanta",
+    "country": "United States"
+  },
+  {
+    "fir": "KZWY",
+    "name": "New York Oceanic",
+    "country": "Bermuda ( United Kingdom)/ United States"
+  },
+  {
+    "fir": "LAAA",
+    "name": "Tirana",
+    "country": "Albania"
+  },
+  {
+    "fir": "LBSR",
+    "name": "Sofia",
+    "country": "Bulgaria"
+  },
+  {
+    "fir": "LCCC",
+    "name": "Nicosia",
+    "country": "Cyprus"
+  },
+  {
+    "fir": "LDZO",
+    "name": "Zagreb",
+    "country": "Croatia"
+  },
+  {
+    "fir": "LECB",
+    "name": "Barcelona",
+    "country": "Spain"
+  },
+  {
+    "fir": "LECM",
+    "name": "Madrid",
+    "country": "Spain"
+  },
+  {
+    "fir": "LECS",
+    "name": "Sevilla",
+    "country": "Spain"
+  },
+  {
+    "fir": "LFBB",
+    "name": "Bordeaux",
+    "country": "France"
+  },
+  {
+    "fir": "LFEE",
+    "name": "Reims",
+    "country": "France"
+  },
+  {
+    "fir": "LFFF",
+    "name": "Paris",
+    "country": "France"
+  },
+  {
+    "fir": "LFMM",
+    "name": "Marseille",
+    "country": "France"
+  },
+  {
+    "fir": "LFRR",
+    "name": "Brest",
+    "country": "France"
+  },
+  {
+    "fir": "LGGG",
+    "name": "Athens",
+    "country": "Greece"
+  },
+  {
+    "fir": "LHCC",
+    "name": "Budapest",
+    "country": "Hungary"
+  },
+  {
+    "fir": "LIBB",
+    "name": "Brindisi",
+    "country": "Italy"
+  },
+  {
+    "fir": "LIMM",
+    "name": "Milano",
+    "country": "Italy"
+  },
+  {
+    "fir": "LIRR",
+    "name": "Roma",
+    "country": "Italy"
+  },
+  {
+    "fir": "LJLA",
+    "name": "Ljubljana",
+    "country": "Slovenia"
+  },
+  {
+    "fir": "LKAA",
+    "name": "Praha",
+    "country": "Czech Republic"
+  },
+  {
+    "fir": "LLLL",
+    "name": "Tel-Aviv",
+    "country": "Israel"
+  },
+  {
+    "fir": "LMMM",
+    "name": "Malta",
+    "country": "Malta"
+  },
+  {
+    "fir": "LOVV",
+    "name": "Wien",
+    "country": "Austria"
+  },
+  {
+    "fir": "LPPC",
+    "name": "Lisboa",
+    "country": "Portugal"
+  },
+  {
+    "fir": "LPPO",
+    "name": "Santa Maria",
+    "country": "Azores ( Portugal)"
+  },
+  {
+    "fir": "LQSB",
+    "name": "Sarajevo",
+    "country": "Bosnia and Herzegovina"
+  },
+  {
+    "fir": "LRBB",
+    "name": "Bucureşti",
+    "country": "Romania"
+  },
+  {
+    "fir": "LSAG",
+    "name": "Geneve",
+    "country": "Switzerland"
+  },
+  {
+    "fir": "LSAS",
+    "name": "Switzerland",
+    "country": "Switzerland"
+  },
+  {
+    "fir": "LSAZ",
+    "name": "Zurich",
+    "country": "Switzerland"
+  },
+  {
+    "fir": "LTAA",
+    "name": "Ankara",
+    "country": "Turkey"
+  },
+  {
+    "fir": "LTBB",
+    "name": "Istanbul",
+    "country": "Turkey"
+  },
+  {
+    "fir": "LUUU",
+    "name": "Chisinau",
+    "country": "Moldova"
+  },
+  {
+    "fir": "LWSS",
+    "name": "Skopje",
+    "country": "North Macedonia"
+  },
+  {
+    "fir": "LYBA",
+    "name": "Beograd",
+    "country": "Serbia"
+  },
+  {
+    "fir": "LZBB",
+    "name": "Bratislava",
+    "country": "Slovakia"
+  },
+  {
+    "fir": "MDCS",
+    "name": "Santo Domingo",
+    "country": "Dominican Republic"
+  },
+  {
+    "fir": "MHCC",
+    "name": "Central American",
+    "country": "Belize/ Costa Rica/ El Salvador/ Guatemala/ Honduras/ Nicaragua"
+  },
+  {
+    "fir": "MKJK",
+    "name": "Kingston",
+    "country": "Jamaica"
+  },
+  {
+    "fir": "MMFO",
+    "name": "Mazatlan Oceanic",
+    "country": "Mexico"
+  },
+  {
+    "fir": "MMFR",
+    "name": "Mexico",
+    "country": "Mexico"
+  },
+  {
+    "fir": "MPZL",
+    "name": "Panama",
+    "country": "Panama"
+  },
+  {
+    "fir": "MTEG",
+    "name": "Port-au-Prince",
+    "country": "Haiti"
+  },
+  {
+    "fir": "MUFH",
+    "name": "Habana",
+    "country": "Cuba"
+  },
+  {
+    "fir": "MYNA",
+    "name": "Nassau",
+    "country": "Bahamas"
+  },
+  {
+    "fir": "NFFF",
+    "name": "Fiji",
+    "country": "New Caledonia ( France)"
+  },
+  {
+    "fir": "NFFF",
+    "name": "Nadi",
+    "country": "Fiji/ Kiribati/ Vanuatu"
+  },
+  {
+    "fir": "NTTT",
+    "name": "Tahiti",
+    "country": "French Polynesia ( France)"
+  },
+  {
+    "fir": "NZZC",
+    "name": "New Zealand",
+    "country": "New Zealand"
+  },
+  {
+    "fir": "NZZO",
+    "name": "Auckland Oceanic",
+    "country": "New Zealand"
+  },
+  {
+    "fir": "OAKX",
+    "name": "Kabul",
+    "country": "Afghanistan"
+  },
+  {
+    "fir": "OBBB",
+    "name": "Bahrain",
+    "country": "Bahrain"
+  },
+  {
+    "fir": "OEJD",
+    "name": "Jeddah",
+    "country": "Saudi Arabia"
+  },
+  {
+    "fir": "OIIX",
+    "name": "Tehran",
+    "country": "Iran"
+  },
+  {
+    "fir": "OJAC",
+    "name": "Amman",
+    "country": "Jordan"
+  },
+  {
+    "fir": "OKAC",
+    "name": "Kuwait",
+    "country": "Kuwait"
+  },
+  {
+    "fir": "OLBB",
+    "name": "Beirut",
+    "country": "Lebanon"
+  },
+  {
+    "fir": "OMAE",
+    "name": "Emirates",
+    "country": "United Arab Emirates"
+  },
+  {
+    "fir": "OOMM",
+    "name": "Muscat",
+    "country": "Oman"
+  },
+  {
+    "fir": "OPKR",
+    "name": "Karachi",
+    "country": "Pakistan"
+  },
+  {
+    "fir": "OPLR",
+    "name": "Lahore",
+    "country": "Pakistan"
+  },
+  {
+    "fir": "ORBB",
+    "name": "Baghdad",
+    "country": "Iraq"
+  },
+  {
+    "fir": "OSTT",
+    "name": "Damascus",
+    "country": "Syria"
+  },
+  {
+    "fir": "OYSC",
+    "name": "Sanaa",
+    "country": "Yemen"
+  },
+  {
+    "fir": "PAZA",
+    "name": "Anchorage Continental",
+    "country": "United States"
+  },
+  {
+    "fir": "PAZN",
+    "name": "Anchorage Oceanic",
+    "country": "United States"
+  },
+  {
+    "fir": "PHZH",
+    "name": "Honolulu",
+    "country": "United States"
+  },
+  {
+    "fir": "RCAA",
+    "name": "Taibei",
+    "country": "Taiwan"
+  },
+  {
+    "fir": "RJBE",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJCG",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJFF",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJJJ",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJTG",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RKRR",
+    "name": "Incheon",
+    "country": "South Korea"
+  },
+  {
+    "fir": "RPHI",
+    "name": "Manila",
+    "country": "Philippines"
+  },
+  {
+    "fir": "SACF",
+    "name": "Cordoba",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SACU",
+    "name": "Cordoba UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAEF",
+    "name": "Ezeiza",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAEU",
+    "name": "Ezeiza UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAMF",
+    "name": "Mendoza",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAMV",
+    "name": "Mendoza UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SARR",
+    "name": "Resistencia",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAVF",
+    "name": "Comodoro Rivadavia",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAVU",
+    "name": "Comodoro Rivadavia UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SBAO",
+    "name": "Atlantico",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBAZ",
+    "name": "Amazonica",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBBS",
+    "name": "Brasilia",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBCW",
+    "name": "Curitiba",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBRE",
+    "name": "Recife",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SCCZ",
+    "name": "Punta Arenas",
+    "country": "Chile"
+  },
+  {
+    "fir": "SCEZ",
+    "name": "Santiago",
+    "country": "Chile"
+  },
+  {
+    "fir": "SCFZ",
+    "name": "Antofagasta",
+    "country": "Chile"
+  },
+  {
+    "fir": "SCIZ",
+    "name": "Easter Island",
+    "country": "Easter Island ( Chile)"
+  },
+  {
+    "fir": "SCTZ",
+    "name": "Puerto Montt",
+    "country": "Chile"
+  },
+  {
+    "fir": "SEFG",
+    "name": "Guayaquil",
+    "country": "Ecuador"
+  },
+  {
+    "fir": "SGFA",
+    "name": "Asuncion",
+    "country": "Paraguay"
+  },
+  {
+    "fir": "SKEC",
+    "name": "Barranquilla",
+    "country": "Colombia"
+  },
+  {
+    "fir": "SKED",
+    "name": "Bogota",
+    "country": "Colombia"
+  },
+  {
+    "fir": "SLLF",
+    "name": "La Paz",
+    "country": "Bolivia"
+  },
+  {
+    "fir": "SMPM",
+    "name": "Paramaribo",
+    "country": "Suriname"
+  },
+  {
+    "fir": "SOOO",
+    "name": "Rochambeau",
+    "country": "French Guiana ( France)"
+  },
+  {
+    "fir": "SPIM",
+    "name": "Lima",
+    "country": "Peru"
+  },
+  {
+    "fir": "SUEO",
+    "name": "Montevideo",
+    "country": "Uruguay"
+  },
+  {
+    "fir": "SVZM",
+    "name": "Maiquetia",
+    "country": "Venezuela"
+  },
+  {
+    "fir": "SYGC",
+    "name": "Georgetown",
+    "country": "Guyana"
+  },
+  {
+    "fir": "TJZS",
+    "name": "San Juan",
+    "country": "Anguilla ( United Kingdom)/ British Virgin Islands ( United Kingdom)/ Puerto Rico ( United States)/ Sint Maarten ( Netherlands)"
+  },
+  {
+    "fir": "TNCF",
+    "name": "Curaçao",
+    "country": "Aruba/ Curaçao ( Netherlands)/ Caribbean Netherlands ( Netherlands)"
+  },
+  {
+    "fir": "TTZP",
+    "name": "Piarco",
+    "country": "Barbados/ Dominica/ Grenada/ Guadeloupe ( France)/ Saint Kitts and Nevis/ Saint Lucia/ Trinidad and Tobago/ Saint Vincent and the Grenadines"
+  },
+  {
+    "fir": "UAAA",
+    "name": "Almaty",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UACN",
+    "name": "Astana",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UAII",
+    "name": "Shymkent",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UATT",
+    "name": "Aktobe",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UBBA",
+    "name": "Baku",
+    "country": "Azerbaijan"
+  },
+  {
+    "fir": "UCFM",
+    "name": "Bishkek",
+    "country": "Kyrgyzstan"
+  },
+  {
+    "fir": "UCFO",
+    "name": "Osh",
+    "country": "Kyrgyzstan"
+  },
+  {
+    "fir": "UDDD",
+    "name": "Yerevan",
+    "country": "Armenia"
+  },
+  {
+    "fir": "UEEE",
+    "name": "Yakutsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UGGG",
+    "name": "Tbilisi",
+    "country": "Georgia"
+  },
+  {
+    "fir": "UHHH",
+    "name": "Khabarovsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UHMM",
+    "name": "Magadan",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UHPP",
+    "name": "Petropavlovsk-Kamchatsky",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UIII",
+    "name": "Irkutsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UKBV",
+    "name": "Kyiv",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "UKDV",
+    "name": "Dnipro",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "UKFV",
+    "name": "Simferopol",
+    "country": "Ukraine (de-jure)/ Russian Federation (de-facto)"
+  },
+  {
+    "fir": "UKLV",
+    "name": "Lviv",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "UKOV",
+    "name": "Odesa",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "ULLL",
+    "name": "Sankt-Peterburg",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UMKK",
+    "name": "Kaliningrad",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UMMV",
+    "name": "Minsk",
+    "country": "Belarus"
+  },
+  {
+    "fir": "UNKL",
+    "name": "Krasnoyarsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UNNT",
+    "name": "Novosibirsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "URRV",
+    "name": "Rostov-Na-Donu",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "USSV",
+    "name": "Yekaterinburg",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "USTV",
+    "name": "Tyumen",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UTAA",
+    "name": "Ashgabat",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTAK",
+    "name": "Turkmenbashi",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTAT",
+    "name": "Dashoguz",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTAV",
+    "name": "Turkmenabat",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTDD",
+    "name": "Dushanbe",
+    "country": "Tajikistan"
+  },
+  {
+    "fir": "UTSD",
+    "name": "Samarkand",
+    "country": "Uzbekistan"
+  },
+  {
+    "fir": "UTTR",
+    "name": "Tashkent",
+    "country": "Uzbekistan"
+  },
+  {
+    "fir": "UUWV",
+    "name": "Moscow",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UWWW",
+    "name": "Samara",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "VABF",
+    "name": "Mumbai",
+    "country": "India"
+  },
+  {
+    "fir": "VCCC",
+    "name": "Colombo",
+    "country": "Sri Lanka"
+  },
+  {
+    "fir": "VDPF",
+    "name": "Phnom Penh",
+    "country": "Cambodia"
+  },
+  {
+    "fir": "VECF",
+    "name": "Kolkata",
+    "country": "Bhutan/ India"
+  },
+  {
+    "fir": "VGFR",
+    "name": "Dhaka",
+    "country": "Bangladesh"
+  },
+  {
+    "fir": "VHHK",
+    "name": "Hong Kong",
+    "country": "Hong Kong"
+  },
+  {
+    "fir": "VIDF",
+    "name": "Delhi",
+    "country": "India"
+  },
+  {
+    "fir": "VLVT",
+    "name": "Vientiane",
+    "country": "Laos"
+  },
+  {
+    "fir": "VNSM",
+    "name": "Kathmandu",
+    "country": "Nepal"
+  },
+  {
+    "fir": "VOMF",
+    "name": "Chennai",
+    "country": "India"
+  },
+  {
+    "fir": "VRMF",
+    "name": "Male",
+    "country": "Maldives"
+  },
+  {
+    "fir": "VTBB",
+    "name": "Bangkok",
+    "country": "Thailand"
+  },
+  {
+    "fir": "VVHM",
+    "name": "Ho Chi Minh",
+    "country": "Vietnam"
+  },
+  {
+    "fir": "VVHN",
+    "name": "Hanoi",
+    "country": "Vietnam"
+  },
+  {
+    "fir": "VYYF",
+    "name": "Yangon",
+    "country": "Myanmar"
+  },
+  {
+    "fir": "WAAF",
+    "name": "Ujung Pandang",
+    "country": "Indonesia/ Timor Leste"
+  },
+  {
+    "fir": "WBFC",
+    "name": "Kota Kinabalu",
+    "country": "Brunei/ Malaysia"
+  },
+  {
+    "fir": "WIIF",
+    "name": "Jakarta",
+    "country": "Indonesia"
+  },
+  {
+    "fir": "WMFC",
+    "name": "Kuala Lumpur",
+    "country": "Malaysia"
+  },
+  {
+    "fir": "WSJC",
+    "name": "Singapore",
+    "country": "Singapore"
+  },
+  {
+    "fir": "YBBB",
+    "name": "Brisbane",
+    "country": "Australia"
+  },
+  {
+    "fir": "YMMM",
+    "name": "Melbourne",
+    "country": "Australia"
+  },
+  {
+    "fir": "ZBPE",
+    "name": "Beijing",
+    "country": "China"
+  },
+  {
+    "fir": "ZGZU",
+    "name": "Guangzhou",
+    "country": "China"
+  },
+  {
+    "fir": "ZHWH",
+    "name": "Wuhan",
+    "country": "China"
+  },
+  {
+    "fir": "ZJSA",
+    "name": "Sanya",
+    "country": "China"
+  },
+  {
+    "fir": "ZKKP",
+    "name": "Pyongyang",
+    "country": "North Korea"
+  },
+  {
+    "fir": "ZLHW",
+    "name": "Lanzhou",
+    "country": "China"
+  },
+  {
+    "fir": "ZMUB",
+    "name": "Ulaanbaatar",
+    "country": "Mongolia"
+  },
+  {
+    "fir": "ZPKM",
+    "name": "Kunming",
+    "country": "China"
+  },
+  {
+    "fir": "ZSHA",
+    "name": "Shanghai",
+    "country": "China"
+  },
+  {
+    "fir": "ZWUQ",
+    "name": "Urumqi",
+    "country": "China"
+  },
+  {
+    "fir": "ZYSH",
+    "name": "Shenyang",
+    "country": "China"
+  }
+];
+
 window.addEventListener("error", (e) => {
     alert(e.message);
 });
@@ -88,6 +1477,30 @@ const fileInput = document.getElementById("file");
 const viewer = document.getElementById("viewer");
 
 const renderedPages = [];
+
+///FIR extraction from LEGS
+let firLookup = new Map();
+
+function initFIRDatabase() {
+    firLookup = new Map(
+        FIR_DATA.map(item => [
+            item.fir.trim().toUpperCase(),
+            {
+                name: item.name,
+                country: item.country
+            }
+        ])
+    );
+
+    console.log("FIR loaded:", firLookup.size);
+}
+
+initFIRDatabase();
+
+function getFIRInfo(code) {
+    const key = (code || "").trim().toUpperCase();
+    return firLookup.get(key) || { name: "", country: "" };
+}
 
 /* -----------------------------
    TIME DIFFERENCE (HH:MM)
@@ -126,7 +1539,8 @@ fileInput.addEventListener("change", async (e) => {
     let sidLine = null;
     let starLine = null;
 
-     const targetSet = new Set([
+    ///VWS extraction
+    const targetSet = new Set([
         "004","005","006","007","008","009",
         "010","011","012","013","014","015",
         "016","017","018","019"
@@ -193,7 +1607,6 @@ fileInput.addEventListener("change", async (e) => {
         }
     }
 
-
     for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
 
         const pg = await pdf.getPage(p);
@@ -240,7 +1653,7 @@ fileInput.addEventListener("change", async (e) => {
 
     ///CLB SCHEDULE
     const matches = [];
-    const seenCodes = new Set();
+    let lastCode = null;
 
     for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
 
@@ -261,9 +1674,9 @@ fileInput.addEventListener("change", async (e) => {
             // 🔥 filter: first digit must be 2, 3, or 4
             if (!/^[234]/.test(code)) continue;
 
-            // 🔥 only first occurrence
-            if (seenCodes.has(code)) continue;
-            seenCodes.add(code);
+            // only record when code changes
+            if (code === lastCode) continue;
+            lastCode = code;
 
             const before5 = tokens[i - 5];
             if (!before5) continue;
@@ -275,7 +1688,7 @@ fileInput.addEventListener("change", async (e) => {
             });
         }
     }
-
+    
     ///EDTO INFORMATION
     let edtoPage = null;
 
@@ -412,6 +1825,197 @@ fileInput.addEventListener("change", async (e) => {
             }
         }
     }
+
+
+    ///FIRs
+    const resultsFIR = [];
+
+    function isFIR(t) {
+        return /^-[A-Z]{4}$/.test(t);
+    }
+
+    function isWP5(t) {
+        return /^[A-Z]{5}$/.test(t);
+    }
+
+    function isWP3(t) {
+        return /^[A-Z]{3}$/.test(t);
+    }
+
+    function isFIRTime(t) {
+        return /^\d{3}\.\d$/.test(t);
+    }
+
+    function cleanTime(t) {
+        return (t || "").slice(0, 5);
+    }
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const tokens = tc.items.map(i => (i.str || "").trim());
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const t = tokens[i];
+
+            // =========================
+            // FIR extraction
+            // =========================
+            if (isFIR(t)) {
+
+                const timeToken = tokens[i + 2] || "";
+                const time = cleanTime(timeToken);
+
+                resultsFIR.push({
+                    type: "FIR",
+                    fir: t.replace("-", ""),
+                    time,
+                    waypoint: null
+                });
+            }
+
+            // =========================
+            // 5-letter waypoint
+            // =========================
+            if (isWP5(t)) {
+
+                const timeToken = tokens[i + 2] || "";
+                const time = cleanTime(timeToken);
+
+                resultsFIR.push({
+                    type: "WP5",
+                    waypoint: t,
+                    time
+                });
+            }
+
+            // =========================
+            // 3-letter waypoint
+            // =========================
+            if (isWP3(t)) {
+
+                const check = tokens[i + 2] || "";
+
+                if (!isTime(check)) continue;
+
+                const timeToken = tokens[i + 4] || "";
+                const time = cleanTime(timeToken);
+
+                resultsFIR.push({
+                    type: "WP3",
+                    waypoint: t,
+                    time
+                });
+            }
+        }
+    }
+
+    
+    const firMap = new Map();
+    const waypointMap = new Map();
+
+    // =========================
+    // STEP 1: BUILD MAPS
+    // =========================
+    for (const r of resultsFIR) {
+
+        if (r.type === "FIR") {
+            firMap.set(r.time, r.fir);
+        }
+
+        if (r.type === "WP5" || r.type === "WP3") {
+            if (!waypointMap.has(r.time)) {
+                waypointMap.set(r.time, []);
+            }
+            waypointMap.get(r.time).push(r.waypoint);
+        }
+    }
+
+    // ordered FIR timeline
+    const firEntries = [...firMap.entries()];
+
+    const annotations = [];
+
+    // =========================
+    // STEP 2: RESOLVE FIR → WAYPOINT
+    // =========================
+    for (let i = 0; i < firEntries.length; i++) {
+
+        const [time, fir] = firEntries[i];
+
+        let waypoint = null;
+        let fallbackWaypointTime = null;
+
+        // =========================
+        // 1. EXACT MATCH
+        // =========================
+        const exact = waypointMap.get(time);
+        if (exact && exact.length > 0) {
+
+            waypoint = exact[0];
+
+        } else {
+
+            // =========================
+            // 2. FALLBACK: closest previous waypoint
+            // =========================
+            let bestTime = null;
+            let bestWaypoint = null;
+
+            for (const [wpTime, wps] of waypointMap.entries()) {
+
+                if (wpTime < time && wps && wps.length > 0) {
+
+                    if (bestTime === null || wpTime > bestTime) {
+                        bestTime = wpTime;
+                        bestWaypoint = wps[wps.length - 1];
+                    }
+                }
+            }
+
+            if (bestWaypoint) {
+                waypoint = bestWaypoint;
+                fallbackWaypointTime = bestTime;
+            }
+        }
+
+        // =========================
+        // STEP 3: OUTPUT
+        // =========================
+        const info = getFIRInfo(fir);
+
+        if (waypoint) {
+
+            annotations.push({
+                time,
+                fir,
+                firName: info.name || "",
+                country: info.country || "",
+                waypoint,
+                fallbackTime: fallbackWaypointTime || null
+            });
+
+        } else {
+
+            annotations.push({
+                time,
+                fir,
+                firName: info.name || "",
+                country: info.country || "",
+                waypoint: null,
+                fallbackTime: null
+            });
+        }
+    }
+
+
+
+
+
+
+
 
 
 
@@ -808,7 +2412,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -832,7 +2436,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -856,7 +2460,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -880,7 +2484,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -904,7 +2508,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -928,7 +2532,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -954,7 +2558,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -978,7 +2582,7 @@ fileInput.addEventListener("change", async (e) => {
                 const width = (String(converted).length + 2) * charWidth;
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
 
@@ -1054,7 +2658,7 @@ fileInput.addEventListener("change", async (e) => {
                 const ty = viewport.height - (t[5] * scale);
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
 
                 octx.fillText(converted, tx + 110, ty + 1);
             }
@@ -1083,7 +2687,7 @@ fileInput.addEventListener("change", async (e) => {
                 const ty = viewport.height - (t[5] * scale);
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
 
                 octx.fillText(converted, tx + 110, ty + 1);
             }
@@ -1111,18 +2715,18 @@ fileInput.addEventListener("change", async (e) => {
                 const ty = viewport.height - (t[5] * scale);
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
 
                 octx.fillText(converted, tx + 110, ty + 1);
                 
                 if (rtow !== null) {
 
                     octx.fillStyle = "blue";
-                    octx.font = "14px Calibri";
+                    octx.font = "12px Helvetica";
 
                     octx.fillText(
                         `RTOW ${rtow}`,
-                        tx + 72,
+                        tx + 71,
                         ty + 18 // slightly below PLWT line
                     );
                 }
@@ -1132,11 +2736,11 @@ fileInput.addEventListener("change", async (e) => {
                 if (excess !== null) {
 
                     octx.fillStyle = "blue";
-                    octx.font = "14px Calibri";
+                    octx.font = "12px Helvetica";
 
                     octx.fillText(
                         `EXCESS  ${excess}`,
-                        tx + 71,
+                        tx + 62,
                         ty + 32
                     );
                 }
@@ -1185,7 +2789,7 @@ fileInput.addEventListener("change", async (e) => {
             const diff = diffHM(depTime, arrTime);
 
             octx.fillStyle = "blue";
-            octx.font = "14px Calibri";
+            octx.font = "12px Helvetica";
 
             octx.fillText(
                 `BLK: ${diff.hours}h ${diff.mins}m`,
@@ -1198,9 +2802,9 @@ fileInput.addEventListener("change", async (e) => {
         if (pageNum === 1) {
 
             octx.fillStyle = "blue";
-            octx.font = "14px Calibri";
+            octx.font = "12px Helvetica";
 
-            octx.fillText("VWS:", 800, 145);
+            octx.fillText("VWS:", 798, 145);
 
             let y = 160;
 
@@ -1208,7 +2812,7 @@ fileInput.addEventListener("change", async (e) => {
 
                 octx.fillText(
                     `${r.before || "?"} : ${r.match}`,
-                    800,
+                    798,
                     y
                 );
 
@@ -1216,11 +2820,11 @@ fileInput.addEventListener("change", async (e) => {
             }
 
             y += 20
-            octx.fillText("CLB SCHED:", 800, y);
+            octx.fillText("CLB SCHED:", 798, y);
 
             y += 15
             for (const m of matches) {
-                octx.fillText(`${m.code}:   ${m.value}`, 800, y);
+                octx.fillText(`FL${m.code} : ${m.value}`, 798, y);
                 y += 18;
             }
         }
@@ -1236,7 +2840,7 @@ fileInput.addEventListener("change", async (e) => {
             const diffMins = diff % 60;
 
             octx.fillStyle = "blue";
-            octx.font = "14px Calibri";
+            octx.font = "12px Helvetica";
 
             octx.fillText(
                 `NET: ${diffHours}h ${diffMins}m`,
@@ -1262,18 +2866,20 @@ fileInput.addEventListener("change", async (e) => {
                     const thirdHM = toHM(third);
 
                     octx.fillStyle = "blue";
-                    octx.font = "14px Calibri";
+                    octx.font = "12px Helvetica";
+                    
+                    octx.fillText("Crew Rest:", 750, 1088);
 
                     octx.fillText(
                         `DBL: ${halfHM.hours}h ${halfHM.mins}m`,
-                        700,
+                        750,
                         1100
                     );
 
                     octx.fillText(
                         `AUG: ${thirdHM.hours}h ${thirdHM.mins}m`,
-                        700,
-                        1115
+                        750,
+                        1112
                     );
                 }
             }
@@ -1287,7 +2893,7 @@ fileInput.addEventListener("change", async (e) => {
             if (result !== null) {
 
                 octx.fillStyle = "blue";
-                octx.font = "14px Calibri";
+                octx.font = "12px Helvetica";
 
                 octx.fillText(
                     `> ${result} ${altnAirport}`,
@@ -1300,7 +2906,7 @@ fileInput.addEventListener("change", async (e) => {
         ///SIDSTAR
         if (pageNum === 1) {
             octx.fillStyle = "blue";
-            octx.font = "14px Calibri";
+            octx.font = "12px Helvetica";
 
             octx.fillText(
                 `DEP: ${sidLine || "Not found"}`,
@@ -1318,7 +2924,7 @@ fileInput.addEventListener("change", async (e) => {
         ///HIGH GROUND
         if (pageNum === 1) {
             octx.fillStyle = "blue";
-            octx.font = "14px Calibri";
+            octx.font = "12px Helvetica";
 
             octx.fillText("HIGH GROUND:", 650, 145);
 
@@ -1341,7 +2947,7 @@ fileInput.addEventListener("change", async (e) => {
         if (pageNum === 1 && edtoGroups.length > 0) {
 
             octx.fillStyle = "blue";
-            octx.font = "14px Calibri";
+            octx.font = "12px Helvetica";
 
             let y = 145;
 
@@ -1359,7 +2965,50 @@ fileInput.addEventListener("change", async (e) => {
             }
         }
 
+        ///FIR
+        if (pageNum === 2) {
 
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+
+            let y = 700;
+
+            octx.fillText("FIR INFO:", 65, y);
+
+            y += 15;
+
+            for (const a of annotations) {
+
+            const x1 = 65;   // time
+            const x2 = 100;  // FIR code - FIR name
+            const x3 = 260;  // waypoint
+            const x4 = 305;  // fallback time
+            const x5 = 355;  // country
+
+            // TIME
+            octx.fillText(a.time || "", x1, y);
+
+            // FIR CODE - FIR NAME
+            octx.fillText(
+                `${a.fir || ""} - ${a.firName || "not in database"}`,
+                x2,
+                y
+            );
+
+            // WAYPOINT
+            octx.fillText(a.waypoint || "", x3, y);
+
+            // FALLBACK TIME
+            if (a.fallbackTime) {
+                octx.fillText(`(${a.fallbackTime})`, x4, y);
+            }
+
+            // COUNTRY
+            octx.fillText(a.country || "", x5, y);
+
+            y += 15;
+        }
+        }
 
 
 
