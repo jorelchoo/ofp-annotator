@@ -121,7 +121,7 @@ fileInput.addEventListener("change", async (e) => {
     const buffer = await file.arrayBuffer();
     const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
 
-    const scale = 2.5;
+    const scale = 1.5;
 
     let sidLine = null;
     let starLine = null;
