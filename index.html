@@ -2010,6 +2010,279 @@ fileInput.addEventListener("change", async (e) => {
         }
     }
 
+    /* =========================================================
+    AIRPORT WX LIST EXTRACTION
+    ========================================================= */
+
+    let wxStartPage = null;
+    let wxEndPage = null;
+
+    /* -----------------------------
+    FIND START / END PAGES
+    ------------------------------ */
+    for (let p = 1; p <= pdf.numPages; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const text = tc.items.map(i => i.str).join(" ");
+
+        if (text.includes("Airport WX List") && wxStartPage === null) {
+            wxStartPage = p;
+        }
+
+        if (text.includes("AIRPORTLIST ENDED")) {
+            wxEndPage = p;
+            break;
+        }
+    }
+
+    /* -----------------------------
+    STORAGE
+    ------------------------------ */
+    let destinationWX = "";
+    let departureWX = "";
+
+    /* -----------------------------
+    WEATHER BREAK FORMATTER
+    ------------------------------ */
+    function addWeatherBreaks(str) {
+
+        return str
+            .replace(/\s+(SA)\b/g, "\n$1")
+            .replace(/\s+(FT)\b/g, "\n$1")
+            .replace(/\s+(TEMPO)\b/g, "\n$1")
+            .replace(/\s+(INTER)\b/g, "\n$1")
+            .replace(/\s+(PROB\d{0,2})\b/g, "\n$1")
+            .replace(/\s+(FM\d{4,6})\b/g, "\n$1")
+            .replace(/\s+(BECMG)\b/g, "\n$1");
+    }
+
+    /* =========================================================
+    SCAN WX BLOCK
+    ========================================================= */
+    for (let p = wxStartPage; p <= wxEndPage; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const tokens = tc.items.map(i => i.str);
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const t = tokens[i];
+
+            /* =========================
+            DESTINATION WX
+            ========================= */
+            if (t.includes("DESTINATION AIRPORT:")) {
+
+                let buf = "";
+                let started = false;
+
+                for (let j = i; j < tokens.length; j++) {
+
+                    const t2 = tokens[j];
+
+                    // start ONLY at FT
+                    if (!started) {
+                        if (t2 === "FT" || t2.includes("FT")) {
+                            started = true;
+                        } else {
+                            continue; // ignore everything before FT
+                        }
+                    }
+
+                    buf += " " + t2;
+
+                    // stop AFTER including "="
+                    if (t2.includes("=")) {
+                        break;
+                    }
+                }
+
+                destinationWX = buf.trim();
+            }
+
+            /* =========================
+            DEPARTURE WX
+            ========================= */
+            if (t.includes("DEPARTURE AIRPORT:")) {
+
+                let buf = "";
+                let started = false;
+
+                for (let j = i; j < tokens.length; j++) {
+
+                    const t2 = tokens[j];
+
+                    // STOP BEFORE including "Space Weather Advisory:"
+                    if (t2.includes("Space Weather Advisory:")) {
+                        break;
+                    }
+
+                    // WAIT FOR SA BEFORE STARTING CAPTURE
+                    if (!started) {
+                        if (t2 === "SA") {
+                            started = true;
+                            buf += " " + t2;
+                        }
+                        continue;
+                    }
+
+                    // once started, keep collecting
+                    buf += " " + t2;
+                }
+
+                departureWX = buf.trim();
+            }
+        }
+    }
+
+    /* =========================================================
+    FORMAT INTO WEATHER LINES
+    ========================================================= */
+    function formatWX(raw) {
+
+        if (!raw) return [];
+
+        const formatted = addWeatherBreaks(raw);
+        const groups = formatted.split("\n");
+
+        const weatherLines = [];
+
+        for (const g of groups) {
+
+            const trimmed = g.trim();
+            if (!trimmed) continue;
+
+            const wrapped = trimmed.match(/.{1,90}/g) || [trimmed];
+
+            for (const w of wrapped) {
+                weatherLines.push(w);
+            }
+        }
+
+        return weatherLines;
+    }
+
+    const destLines = formatWX(destinationWX);
+    const depLines = formatWX(departureWX);
+
+    ///FORECAST WINDS
+    /// FORECAST WIND EXTRACTION + ARROWS
+    let forecastStartPage = null;
+
+    let clbWinds = [];
+    let desWinds = [];
+
+    // 1. FIND START PAGE
+    for (let p = 1; p <= pdf.numPages; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ").toUpperCase();
+
+        if (text.includes("FORECAST WIND -")) {
+            forecastStartPage = p;
+            break;
+        }
+    }
+
+    if (forecastStartPage) {
+
+        const endPage = Math.min(forecastStartPage + 2, pdf.numPages);
+
+        for (let p = forecastStartPage; p <= endPage; p++) {
+
+            const page = await pdf.getPage(p);
+            const tc = await page.getTextContent();
+            const tokens = tc.items.map(i => (i.str || "").trim());
+
+            for (let i = 0; i < tokens.length; i++) {
+
+                const t = tokens[i];
+
+                // =========================
+                // CLB WINDS
+                // =========================
+                if (t === "CLB" && tokens[i + 2]) {
+
+                    const raw = tokens[i + 2];
+
+                    const matches = raw.match(/\d{5}/g) || [];
+
+                    clbWinds = matches.slice(0, 4).map(w => ({
+                        dir: w.slice(0, 3),
+                        spd: w.slice(3)
+                    }));
+                }
+
+                // =========================
+                // DES WINDS
+                // =========================
+                if (t === "DES" && tokens[i + 2]) {
+
+                    const raw = tokens[i + 2];
+
+                    const matches = raw.match(/\d{5}/g) || [];
+
+                    desWinds = matches.slice(0, 4).map(w => ({
+                        dir: w.slice(0, 3),
+                        spd: w.slice(3)
+                    }));
+                }
+            }
+        }
+    }
+
+    function drawWindArrow(octx, x, y, dirDeg, speed) {
+
+        const angle = (parseInt(dirDeg, 10) * Math.PI) / 180;
+
+        const length = 30;
+
+        const x2 = x + Math.sin(angle) * length;
+        const y2 = y - Math.cos(angle) * length;
+
+        // line
+        octx.strokeStyle = "blue";
+        octx.lineWidth = 1;
+
+        octx.beginPath();
+        octx.moveTo(x, y);
+        octx.lineTo(x2, y2);
+        octx.stroke();
+
+        // arrow head
+        const head = 8;
+        const left = angle - Math.PI / 6;
+        const right = angle + Math.PI / 6;
+
+        octx.beginPath();
+        octx.moveTo(x2, y2);
+        octx.lineTo(
+            x2 - Math.sin(left) * head,
+            y2 + Math.cos(left) * head
+        );
+        octx.lineTo(
+            x2 - Math.sin(right) * head,
+            y2 + Math.cos(right) * head
+        );
+        octx.closePath();
+        octx.fillStyle = "blue";
+        octx.fill();
+
+        // label under arrow
+        octx.fillStyle = "blue";
+        octx.font = "10px Helvetica";
+        octx.fillText(`${dirDeg}°/${speed}`, x - 10, y + 18);
+    }
+
+
+
+
+
+
 
 
 
@@ -2052,9 +2325,9 @@ fileInput.addEventListener("change", async (e) => {
         const textContent = await page.getTextContent();
         const text = textContent.items.map(i => i.str).join(" ");
 
-        /* -----------------------------
-        STATE
-        ----------------------------- */
+
+        ///DECLARED VARIABLES
+
         let depTime = null;
         let arrTime = null;
 
@@ -2075,7 +2348,11 @@ fileInput.addEventListener("change", async (e) => {
 
         let afterRteNo = false;
         let captFound = false;
-    
+
+        let contingencyFuel = null;
+        let excessFuel = null;
+        let reserveFuel = null;
+
         function calcExcess(rtow, ptow) {
             if (rtow == null || ptow == null) return null;
             return Math.round((rtow - ptow) * 10) / 10;
@@ -2151,6 +2428,7 @@ fileInput.addEventListener("change", async (e) => {
             return Math.ceil(val * 10) / 10;
         }
 
+        
     
 
 
@@ -2419,25 +2697,24 @@ fileInput.addEventListener("change", async (e) => {
             ///Contingency
             if (upper.includes("CONT")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+                const valueItem = textContent.items[i + 4];
 
-                if (!valueItem || !valueItem.str) continue;
+                if (valueItem && valueItem.str) {
+                    const converted = convertFuel(valueItem.str);
 
-                const converted = convertFuel(valueItem.str);
+                    if (converted !== null) {
 
-                if (converted === null) continue;
+                        contingencyFuel = converted;
 
-                const t = valueItem.transform || item.transform;
+                        const t = valueItem.transform || item.transform;
+                        const tx = t[4] * scale;
+                        const ty = viewport.height - (t[5] * scale);
 
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
-
-                const charWidth = 9;
-                const width = (String(converted).length + 2) * charWidth;
-
-                octx.fillStyle = "blue";
-                octx.font = "12px Helvetica";
-                octx.fillText(converted, tx + 65, ty);
+                        octx.fillStyle = "blue";
+                        octx.font = "12px Helvetica";
+                        octx.fillText(converted, tx + 65, ty);
+                    }
+                }
             }
 
             ///ALTN FUEL
@@ -2541,25 +2818,25 @@ fileInput.addEventListener("change", async (e) => {
 
             if (upper.includes("EXCESS FUEL")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+                const valueItem = textContent.items[i + 4];
 
-                if (!valueItem || !valueItem.str) continue;
+                if (valueItem && valueItem.str) {
+                    const converted = convertFuel(valueItem.str);
 
-                const converted = convertFuel(valueItem.str);
+                    if (converted !== null) {
 
-                if (converted === null) continue;
+                        excessFuel = converted;
 
-                const t = valueItem.transform || item.transform;
+                        const t = valueItem.transform || item.transform;
 
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
+                        const tx = t[4] * scale;
+                        const ty = viewport.height - (t[5] * scale);
 
-                const charWidth = 9;
-                const width = (String(converted).length + 2) * charWidth;
-
-                octx.fillStyle = "blue";
-                octx.font = "12px Helvetica";
-                octx.fillText(converted, tx + 65, ty);
+                        octx.fillStyle = "blue";
+                        octx.font = "12px Helvetica";
+                        octx.fillText(converted, tx + 65, ty);
+                    }
+                }
             }
 
             ///FUEL IN TANKS
@@ -2633,6 +2910,48 @@ fileInput.addEventListener("change", async (e) => {
                         ty: viewport.height - (t[5] * scale)
                     };
                 }
+            }
+
+            ///LANDING FUEL
+            let ldgFuel = null;
+
+            reserveFuel = sumAltFuel(altnFuelValue, altnFuelHoldValue);
+
+            if (
+                contingencyFuel !== null &&
+                excessFuel !== null &&
+                altnFuelValue !== null &&
+                altnFuelHoldValue !== null
+            ) {
+                ldgFuel =
+                    contingencyFuel +
+                    excessFuel+
+                    reserveFuel;
+
+                ldgFuel = Math.ceil(ldgFuel * 10) / 10;
+            }
+
+            if (upper.includes("FUEL IN TANKS")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(`LDG FUEL: ${ldgFuel}`, tx, ty + 20);
             }
 
             /// PZFW
@@ -3007,9 +3326,116 @@ fileInput.addEventListener("change", async (e) => {
             octx.fillText(a.country || "", x5, y);
 
             y += 15;
-        }
+            }
         }
 
+        ///WEATHER ANNOTATION
+        if (pageNum === 1) {
+
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+
+            let y = 1200;
+
+            /* ---------------- DEST ---------------- */
+            octx.fillText("Destination WX:", 65, y);
+            y += 15;
+
+            for (const weatherLine of destLines) {
+
+                octx.fillText(weatherLine, 65, y);
+                y += 12;
+            }
+
+            y = 1200;
+
+            /* ---------------- DEP ---------------- */
+            octx.fillText("Departure WX:", 400, y);
+            y += 15;
+
+            for (const weatherLine of depLines) {
+
+                octx.fillText(weatherLine, 400, y);
+                y += 12;
+            }
+        }
+
+
+        /// WIND ARROWS RENDER
+        if (pageNum === 2) {
+
+            octx.fillStyle = "blue";
+            octx.font = "11px Helvetica";
+
+            octx.fillText("CLB WINDS:", 600, 700);
+
+            let x = 630;
+            let y = 730;
+
+            for (const w of clbWinds) {
+
+                drawWindArrow(octx, x, y, w.dir, w.spd);
+
+                x += 50; // spacing between wind blocks
+            }
+
+            y += 10;
+
+            octx.fillStyle = "blue";
+            octx.font = "11px Helvetica";
+
+            octx.fillText("DES WINDS:", 600, 780);
+
+            x = 630;
+            y = 810;
+
+            for (const w of desWinds) {
+
+                drawWindArrow(octx, x, y, w.dir, w.spd);
+
+                x += 50;
+            }
+        }
+
+        ///WIND ARROW FL LABELS CLB
+        if (pageNum === 2) {
+            const flSpacing = 50; // ← change this to control spacing
+
+            const fls = ["100", "180", "240", "300"];
+
+            octx.fillStyle = "blue";
+            octx.font = "8px Helvetica";
+
+            let x = 630;
+            const y = 760;
+
+            for (const fl of fls) {
+
+                octx.fillText(`FL${fl}`, x, y);
+
+                x += flSpacing;
+            }
+        }
+
+        ///WIND ARROW FL LABELS DES
+        if (pageNum === 2) {
+            const flSpacing = 50; // adjust spacing between FLs
+
+            const fls = ["350", "310", "200", "100"];
+
+            octx.fillStyle = "blue";
+            octx.font = "8px Helvetica";
+
+            let x = 630;
+            const y = 840;
+
+            for (const fl of fls) {
+
+                octx.fillText(`FL${fl}`, x, y);
+
+                x += flSpacing;
+            }
+        }
 
 
 
