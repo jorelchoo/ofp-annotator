@@ -3224,13 +3224,13 @@ fileInput.addEventListener("change", async (e) => {
 
             octx.fillText(
                 `DEP: ${sidLine || "Not found"}`,
-                700,
+                670,
                 43
             );
 
             octx.fillText(
                 `ARR: ${starLine || "Not found"}`,
-                700,
+                670,
                 58
             );
         }
@@ -3325,12 +3325,12 @@ fileInput.addEventListener("change", async (e) => {
         }
 
         ///WEATHER ANNOTATION
-        if (pageNum === 1) {
+        if (pageNum === 2) {
 
             octx.fillStyle = "blue";
             octx.font = "12px Helvetica";
 
-            let y = 1200;
+            let y = 520;
 
             /* ---------------- DEST ---------------- */
             octx.fillText("Destination WX:", 65, y);
@@ -3342,15 +3342,15 @@ fileInput.addEventListener("change", async (e) => {
                 y += 12;
             }
 
-            y = 1200;
+            y = 600;
 
             /* ---------------- DEP ---------------- */
-            octx.fillText("Departure WX:", 400, y);
+            octx.fillText("Departure WX:", 65, y);
             y += 15;
 
             for (const weatherLine of depLines) {
 
-                octx.fillText(weatherLine, 400, y);
+                octx.fillText(weatherLine, 65, y);
                 y += 12;
             }
         }
