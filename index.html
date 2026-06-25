@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v1.1</h2>
+    <h2>OFP Annotation Tool v1.2</h2>
 </div>
 
 <div class="upload">
@@ -1523,6 +1523,16 @@ function diffHM(dep, arr) {
     };
 }
 
+let dep = "";
+let arr = "";
+let date = "";
+
+let sidOutputPage = null;
+let atcOutputPage = null;
+let wxOutputPage = null;
+let notamOutputPage = null;
+let crewOutputPage = null;
+let edtoOutputPage = null;
 
 /* ----------------------------- */
 fileInput.addEventListener("change", async (e) => {
@@ -1538,9 +1548,7 @@ fileInput.addEventListener("change", async (e) => {
     const scale = 1.5;
 
     let sidLine = null;
-    let starLine = null;
-
-    
+    let starLine = null;  
 
     ///VWS extraction
     const targetSet = new Set([
@@ -2506,6 +2514,9 @@ for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
 
 
 
+
+
+
 const pagesToRender = [1, 2];
 
 if (
@@ -2589,6 +2600,37 @@ if (crewBulletinStartPage !== null) {
 }
 
 
+
+
+for (let i = 0; i < pagesToRender.length; i++) {
+
+    const p = pagesToRender[i];
+
+    if (p === sidPage && sidOutputPage === null) {
+        sidOutputPage = i + 1;
+    }
+
+    if (p === edtoStartPage && edtoOutputPage === null) {
+        edtoOutputPage = i + 1;
+    }
+
+    if (p === atcFlightPlanPage && atcOutputPage === null) {
+        atcOutputPage = i + 1;
+    }
+
+    if (p === airportWxStartPage && wxOutputPage === null) {
+        wxOutputPage = i + 1;
+    }
+
+    if (p === notamStartPage && notamOutputPage === null) {
+        notamOutputPage = i + 1;
+    }
+
+    if (p === crewBulletinStartPage && crewOutputPage === null) {
+        crewOutputPage = i + 1;
+    }
+}
+
     for (const pageNum of pagesToRender) {
 
         const page = await pdf.getPage(pageNum);
@@ -2648,6 +2690,8 @@ if (crewBulletinStartPage !== null) {
         let contingencyFuel = null;
         let excessFuel = null;
         let reserveFuel = null;
+
+
 
         function calcExcess(rtow, ptow) {
             if (rtow == null || ptow == null) return null;
@@ -2741,6 +2785,25 @@ if (crewBulletinStartPage !== null) {
                 afterRteNo = true;
                 captFound = false; // reset per page
                 continue;
+            }
+
+            ///SAVE DETAILS
+            if (pageNum === 1 && str.includes("SIA")) {
+
+                console.log("Found SIA token:", str);
+
+                const routeMatch = str.match(/([A-Z]{3})\/([A-Z]{3})/);
+
+                if (routeMatch) {
+                    dep = routeMatch[1];
+                    arr = routeMatch[2];
+                }
+
+                const dateMatch = str.match(/\d{2}[A-Z]{3}\d{2}/);
+
+                if (dateMatch) {
+                    date = dateMatch[0];
+                }
             }
 
             ///PLAN NUMBER
@@ -3768,9 +3831,9 @@ if (crewBulletinStartPage !== null) {
         if (pageNum === 2) {
 
             octx.fillStyle = "blue";
-            octx.font = "12px Helvetica";
+            octx.font = "10px Helvetica";
 
-            let y = 700;
+            let y = 750;
 
             octx.fillText("FIR INFO:", 65, y);
 
@@ -3779,10 +3842,10 @@ if (crewBulletinStartPage !== null) {
             for (const a of annotations) {
 
             const x1 = 65;   // time
-            const x2 = 100;  // FIR code - FIR name
-            const x3 = 260;  // waypoint
-            const x4 = 305;  // fallback time
-            const x5 = 355;  // country
+            const x2 = 95;  // FIR code - FIR name
+            const x3 = 240;  // waypoint
+            const x4 = 280;  // fallback time
+            const x5 = 330;  // country
 
             // TIME
             octx.fillText(a.time || "", x1, y);
@@ -3813,7 +3876,7 @@ if (crewBulletinStartPage !== null) {
         if (pageNum === 2) {
 
             octx.fillStyle = "blue";
-            octx.font = "12px Helvetica";
+            octx.font = "10px Helvetica";
 
             let y = 520;
 
@@ -3827,7 +3890,7 @@ if (crewBulletinStartPage !== null) {
                 y += 12;
             }
 
-            y = 600;
+            y = 630;
 
             /* ---------------- DEP ---------------- */
             octx.fillText("Departure WX:", 65, y);
@@ -3845,12 +3908,12 @@ if (crewBulletinStartPage !== null) {
         if (pageNum === 2) {
 
             octx.fillStyle = "blue";
-            octx.font = "11px Helvetica";
+            octx.font = "10px Helvetica";
 
-            octx.fillText("CLB WINDS:", 600, 700);
+            octx.fillText("CLB WINDS:", 600, 750);
 
             let x = 630;
-            let y = 730;
+            let y = 780;
 
             for (const w of clbWinds) {
 
@@ -3862,12 +3925,12 @@ if (crewBulletinStartPage !== null) {
             y += 10;
 
             octx.fillStyle = "blue";
-            octx.font = "11px Helvetica";
+            octx.font = "10px Helvetica";
 
-            octx.fillText("DES WINDS:", 600, 780);
+            octx.fillText("DES WINDS:", 600, 830);
 
             x = 630;
-            y = 810;
+            y = 860;
 
             for (const w of desWinds) {
 
@@ -4026,10 +4089,39 @@ if (crewBulletinStartPage !== null) {
             bulletinAnnotations.forEach((m, idx) => {
                 octx.fillText(`${idx + 1}. ${m}`, 65, startY + idx * lineHeight);
             });
-
-
-
         }
+
+        if (pageNum === 1) {
+
+            let tocY = 1050;
+
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+            octx.fillText("Quick Links:", 5, tocY);
+
+            tocY += 18;
+            octx.font = "12px Helvetica";
+
+            octx.fillText(`LEGS`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`EDTO`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`ATC FLT PLN`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`WEATHER`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`NOTAMS`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`INTAMS`, 5, tocY);
+        }
+
+
+
 
 
         /// END
@@ -4077,6 +4169,45 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 
         const img = merged.toDataURL("image/jpeg", 1.0);
 
+        if (p === 0) {
+
+            if (sidOutputPage) {
+                pdf.link(5, 1055, 70, 15, {
+                    pageNumber: sidOutputPage
+                });
+            }
+
+            if (atcOutputPage) {
+                pdf.link(5, 1090, 70, 15, {
+                    pageNumber: atcOutputPage
+                });
+            }
+
+            if (wxOutputPage) {
+                pdf.link(5, 1110, 70, 15, {
+                    pageNumber: wxOutputPage
+                });
+            }
+
+            if (notamOutputPage) {
+                pdf.link(5, 1128, 70, 15, {
+                    pageNumber: notamOutputPage
+                });
+            }
+
+            if (crewOutputPage) {
+                pdf.link(5, 1146, 70, 15, {
+                    pageNumber: crewOutputPage
+                });
+            }
+
+            if (edtoOutputPage) {
+                pdf.link(5, 1073, 70, 15, {
+                    pageNumber: edtoOutputPage
+                });
+            }
+        }
+
         if (p > 0) {
             pdf.addPage(
                 [merged.width, merged.height],
@@ -4094,7 +4225,12 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
         );
     }
 
-    pdf.save("Annotated_OFP.pdf");
+    const fileName =
+        dep && arr && date
+            ? `${dep}${arr}${date}.pdf`
+            : "Annotated_OFP.pdf";
+
+    pdf.save(fileName);
 });
 
 </script>
