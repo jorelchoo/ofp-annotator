@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool</h2>
+    <h2>OFP Annotation Tool v1.1</h2>
 </div>
 
 <div class="upload">
@@ -1567,11 +1567,13 @@ fileInput.addEventListener("change", async (e) => {
 
                 if (targetSet.has(token)) {
 
-                    const beforeRaw = tokens[i - 2] || null;
+                    const before2 = tokens[i - 2] || null;
+                    const before5 = tokens[i - 4] || null;
 
                     results.push({
                         page: p,
-                        before: beforeRaw ? beforeRaw.slice(0, 5) : null,
+                        before2: before2 ? before2.slice(0, 5) : null,
+                        before5: before5,
                         match: token
                     });
                 }
@@ -1683,11 +1685,13 @@ fileInput.addEventListener("change", async (e) => {
 
             const before5 = tokens[i - 5];
             if (!before5) continue;
+            const waypointBefore = tokens[i - 7];
 
             matches.push({
                 page: p,
                 code,
-                value: before5.slice(0, 5)
+                value: before5.slice(0, 5),
+                waypointBefore
             });
         }
     }
@@ -2070,32 +2074,38 @@ fileInput.addEventListener("change", async (e) => {
             ========================= */
             if (t.includes("DESTINATION AIRPORT:")) {
 
-                let buf = "";
-                let started = false;
+              let buf = "";
+              let started = false;
+              let equalsCount = 0;
 
-                for (let j = i; j < tokens.length; j++) {
+              for (let j = i; j < tokens.length; j++) {
 
-                    const t2 = tokens[j];
+                  const t2 = tokens[j];
 
-                    // start ONLY at FT
-                    if (!started) {
-                        if (t2 === "FT" || t2.includes("FT")) {
-                            started = true;
-                        } else {
-                            continue; // ignore everything before FT
-                        }
-                    }
+                  // start ONLY at SA
+                  if (!started) {
+                      if (t2 === "SA" || t2.includes("SA")) {
+                          started = true;
+                      } else {
+                          continue;
+                      }
+                  }
 
-                    buf += " " + t2;
+                  buf += " " + t2;
 
-                    // stop AFTER including "="
-                    if (t2.includes("=")) {
-                        break;
-                    }
-                }
+                  // count "=" occurrences
+                  if (t2.includes("=")) {
+                      equalsCount++;
+                  }
 
-                destinationWX = buf.trim();
-            }
+                  // stop after 2nd "="
+                  if (equalsCount === 2) {
+                      break;
+                  }
+              }
+
+              destinationWX = buf.trim();
+          }
 
             /* =========================
             DEPARTURE WX
@@ -2274,6 +2284,220 @@ fileInput.addEventListener("change", async (e) => {
     }
 
 
+    
+/// FIND LEGS PAGES
+let sidPage = null;
+let starPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (sidPage === null && text.includes("SID TOTAL DIST:")) {
+        sidPage = p;
+    }
+
+    if (starPage === null && text.includes("STAR TOTAL DIST:")) {
+        starPage = p;
+    }
+
+    if (sidPage && starPage) break;
+}
+
+///FIND EDTO INFORMATION PAGES
+let edtoStartPage = null;
+let edtoEndPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        edtoStartPage === null &&
+        text.includes("EDTO INFORMATION:")
+    ) {
+        edtoStartPage = p;
+    }
+
+    if (
+        edtoEndPage === null &&
+        text.includes("EDTO ENROUTE ALTN AIRPORTS:")
+    ) {
+        edtoEndPage = p;
+    }
+
+    if (edtoStartPage && edtoEndPage) break;
+}
+
+///FIND WIND FORECAST PAGES
+const forecastWindPages = new Set();
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (text.includes("FORECAST WIND -")) {
+        forecastWindPages.add(p);
+    }
+}
+
+///ATC Flight Plan
+let atcFlightPlanPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    for (const item of tc.items) {
+
+        const token = (item.str || "").trim();
+
+        if (token === "ATC Flight Plan") {
+            atcFlightPlanPage = p;
+            break;
+        }
+    }
+
+    if (atcFlightPlanPage !== null) break;
+}
+
+///AIRPORT WEATHER PAGES
+let airportWxStartPage = null;
+let airportWxEndPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        airportWxStartPage === null &&
+        text.includes("AIRPORT WX LIST")
+    ) {
+        airportWxStartPage = p;
+    }
+
+    if (
+        airportWxEndPage === null &&
+        text.includes("AIRPORTLIST ENDED")
+    ) {
+        airportWxEndPage = p;
+    }
+
+    if (
+        airportWxStartPage !== null &&
+        airportWxEndPage !== null
+    ) {
+        break;
+    }
+}
+
+///NOTAMS for DEP/ARR
+///NOTAM PAGES
+let notamStartPage = null;
+let notamEndPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        notamStartPage === null &&
+        text.includes("NOTAM") &&
+        text.includes("DEPARTURE AIRPORT")
+    ) {
+        notamStartPage = p;
+    }
+
+    if (
+        notamEndPage === null &&
+        text.includes("DESTINATION ALTERNATE(S)")
+    ) {
+        notamEndPage = p;
+    }
+
+    if (
+        notamStartPage !== null &&
+        notamEndPage !== null
+    ) {
+        break;
+    }
+}
+
+///INTAM / CREW BULLETIN PAGES
+let crewBulletinStartPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        text.includes("INTAM") &&
+        text.includes("CREW BULLETIN")
+    ) {
+        crewBulletinStartPage = p;
+        break;
+    }
+}
+
+const bulletinAnnotations = [];
+
+for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const textContent = await page.getTextContent();
+    const items = textContent.items;
+
+    for (let i = 1; i < items.length - 1; i++) {
+
+        const prev = items[i - 1].str;
+        const current = items[i].str;
+        const next = items[i + 1].str;
+
+        const prevHasEquals = prev.includes("=");
+        const isOneDot = current.includes("1.");
+
+        if (prevHasEquals && isOneDot) {
+            const cleanCurrent = current.replace("1.", "").trim();
+            bulletinAnnotations.push(`${cleanCurrent} - ${next.trim()}`);
+        }
+    }
+}
 
 
 
@@ -2282,13 +2506,90 @@ fileInput.addEventListener("change", async (e) => {
 
 
 
+const pagesToRender = [1, 2];
+
+if (
+    sidPage !== null &&
+    starPage !== null &&
+    starPage >= sidPage
+) {
+    for (let p = sidPage; p <= starPage; p++) {
+        pagesToRender.push(p);
+    }
+}
+
+if (
+    edtoStartPage !== null &&
+    edtoEndPage !== null &&
+    edtoEndPage >= edtoStartPage
+) {
+    for (let p = edtoStartPage; p <= edtoEndPage; p++) {
+
+        if (!pagesToRender.includes(p)) {
+            pagesToRender.push(p);
+        }
+    }
+}
+
+for (const p of forecastWindPages) {
+
+    if (!pagesToRender.includes(p)) {
+        pagesToRender.push(p);
+    }
+}
+
+if (
+    atcFlightPlanPage !== null &&
+    !pagesToRender.includes(atcFlightPlanPage)
+) {
+    pagesToRender.push(atcFlightPlanPage);
+}
+
+if (
+    airportWxStartPage !== null &&
+    airportWxEndPage !== null &&
+    airportWxEndPage >= airportWxStartPage
+) {
+    for (
+        let p = airportWxStartPage;
+        p <= airportWxEndPage;
+        p++
+    ) {
+        pagesToRender.push(p);
+    }
+}
+
+if (
+    notamStartPage !== null &&
+    notamEndPage !== null &&
+    notamEndPage >= notamStartPage
+) {
+    for (
+        let p = notamStartPage;
+        p <= notamEndPage;
+        p++
+    ) {
+        if (!pagesToRender.includes(p)) {
+            pagesToRender.push(p);
+        }
+    }
+}
+
+if (crewBulletinStartPage !== null) {
+
+    for (
+        let p = crewBulletinStartPage;
+        p <= pdf.numPages;
+        p++
+    ) {
+        if (!pagesToRender.includes(p)) {
+            pagesToRender.push(p);
+        }
+    }
+}
 
 
-
-
-
-
-    for (let pageNum = 1; pageNum <= 2; pageNum++) {
+    for (const pageNum of pagesToRender) {
 
         const page = await pdf.getPage(pageNum);
         const viewport = page.getViewport({ scale });
@@ -2568,103 +2869,107 @@ fileInput.addEventListener("change", async (e) => {
             }
 
             /* ---------------- DEP ---------------- */
-            if (upper.includes("DEP")) {
+            if (pageNum === 1) {
+              if (upper.includes("DEP")) {
 
-                const timeMatch = str.match(/\d{4}/);
+                  const timeMatch = str.match(/\d{4}/);
 
-                if (timeMatch) {
+                  if (timeMatch) {
 
-                    depTime = timeMatch[0];
+                      depTime = timeMatch[0];
 
-                    const tx = item.transform[4] * scale;
-                    const ty = viewport.height - (item.transform[5] * scale);
+                      const tx = item.transform[4] * scale;
+                      const ty = viewport.height - (item.transform[5] * scale);
 
-                    const charWidth = 9;
-                    const startX = tx + (10 * charWidth);
-                    const width = 4 * charWidth;
+                      const charWidth = 9;
+                      const startX = tx + (10 * charWidth);
+                      const width = 4 * charWidth;
 
-                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                    octx.fillRect(startX, ty - 10, width, 15);
+                      octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                      octx.fillRect(startX, ty - 10, width, 15);
 
-                    depPos = { tx, ty };
-                }
+                      depPos = { tx, ty };
+                  }
+              }
             }
-
             /* ---------------- ARR ---------------- */
-            if (upper.includes("ARR")) {
+            if (pageNum === 1) {
+                if (upper.includes("ARR")) {
 
-                const timeMatch = str.match(/\d{4}/);
+                    const timeMatch = str.match(/\d{4}/);
 
-                if (timeMatch) {
+                    if (timeMatch) {
 
-                    arrTime = timeMatch[0];
+                        arrTime = timeMatch[0];
 
-                    const tx = item.transform[4] * scale;
-                    const ty = viewport.height - (item.transform[5] * scale);
+                        const tx = item.transform[4] * scale;
+                        const ty = viewport.height - (item.transform[5] * scale);
 
-                    const charWidth = 9;
-                    const startX = tx + (10 * charWidth);
-                    const width = 4 * charWidth;
+                        const charWidth = 9;
+                        const startX = tx + (10 * charWidth);
+                        const width = 4 * charWidth;
 
-                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                    octx.fillRect(startX, ty - 10, width, 15);
+                        octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                        octx.fillRect(startX, ty - 10, width, 15);
 
-                    arrPos = { tx, ty };
+                        arrPos = { tx, ty };
+                    }
                 }
-            }
-
+              }
             ///APD
-            if (upper.includes("APD")) {
+            if (pageNum === 1) {
+              if (upper.includes("APD")) {
 
-                const target = str;
+                  const target = str;
 
-                if (!target) continue;
+                  if (!target) continue;
 
-                const last3 = target.slice(-3);
+                  const last3 = target.slice(-3);
 
-                const t = item.transform;
+                  const t = item.transform;
 
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
+                  const tx = t[4] * scale;
+                  const ty = viewport.height - (t[5] * scale);
 
-                const textWidth = last3.length * 9;
-                const textHeight = 18;
+                  const textWidth = last3.length * 9;
+                  const textHeight = 18;
 
-                octx.save();
+                  octx.save();
 
-                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                octx.fillRect(tx + (target.length - 3) * 9, ty - 12, textWidth, textHeight);
+                  octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                  octx.fillRect(tx + (target.length - 3) * 9, ty - 12, textWidth, textHeight);
 
-                octx.restore();
+                  octx.restore();
+              }
             }
-
             /// Flight time highlight
-            if (upper.includes("BURNOFF")) {
+            if (pageNum === 1) {
+              if (upper.includes("BURNOFF")) {
 
-                const valueItem = textContent.items[i + 2];
+                  const valueItem = textContent.items[i + 2];
 
-                if (!valueItem || !valueItem.str) continue;
+                  if (!valueItem || !valueItem.str) continue;
 
-                const burnTime = valueItem.str;
+                  const burnTime = valueItem.str;
 
-                // must be 12.34 format
-                if (!/^\d{2}\.\d{2}$/.test(burnTime)) continue;
+                  // must be 12.34 format
+                  if (!/^\d{2}\.\d{2}$/.test(burnTime)) continue;
 
-                // safe fallback if transform missing
-                const t = valueItem.transform || item.transform;
+                  // safe fallback if transform missing
+                  const t = valueItem.transform || item.transform;
 
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
+                  const tx = t[4] * scale;
+                  const ty = viewport.height - (t[5] * scale);
 
-                const charWidth = 9;
-                const width = burnTime.length * charWidth;
+                  const charWidth = 9;
+                  const width = burnTime.length * charWidth;
 
-                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                octx.fillRect(tx, ty - 10, width, 15);
+                  octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                  octx.fillRect(tx, ty - 10, width, 15);
 
-                burnoffTime = burnTime;
+                  burnoffTime = burnTime;
+              }
             }
-
             ///Burn-off
             if (upper.includes("BURNOFF")) {
 
@@ -3091,9 +3396,189 @@ fileInput.addEventListener("change", async (e) => {
                 octx.restore();
             }
 
-            ///next
+            ///LEGS PAGES HIGHLIGHTS
+            if (
+                sidPage !== null &&
+                starPage !== null &&
+                pageNum >= sidPage &&
+                pageNum <= starPage
+            ) {
+
+                const token = (item.str || "").trim();
+                const match = token.match(/\d{3}\*\d{4}/);
+
+                if (match) {
+
+                    const tx = item.transform[4] * scale;
+                    const ty = viewport.height - (item.transform[5] * scale);
+
+                    // Find where the match starts inside the string
+                    const startIndex = token.indexOf(match[0]);
+
+                    // Approximate character width
+                    const charWidth = (item.width * scale) / token.length;
+
+                    const highlightX = tx + (startIndex * charWidth);
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 0, 0, 0.35)";
+
+                    octx.fillRect(
+                        highlightX,
+                        ty - 12,
+                        charWidth * 4,   // highlight only XXX*
+                        18
+                    );
+
+                    octx.restore();
+                  }
+
+                let colour = null;
+
+                if (
+                    ["004","005","006","007","008","009"]
+                    .includes(token)
+                ) {
+                    colour = "rgba(255, 235, 59, 0.5)";
+                }
+
+                if (
+                    ["010","011","012","013","014",
+                    "015","016","017","018"]
+                    .includes(token)
+                ) {
+                    colour = "rgba(255, 0, 0, 0.35)";
+                }
+
+                if (colour) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    let textWidth = token.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = colour;
+
+                    octx.fillRect(
+                        tx,
+                        ty - 12,
+                        textWidth,
+                        textHeight
+                    );
+
+                    octx.restore();
+                }
+            }
+
+
+            ///HIGH GROUND AIRPORT WX HIGHLIGHTS
+            ///AIRPORT WX HIGHLIGHTS
+            if (
+                airportWxStartPage !== null &&
+                airportWxEndPage !== null &&
+                pageNum >= airportWxStartPage &&
+                pageNum <= airportWxEndPage
+            ) {
+
+                const token = (item.str || "").trim().toUpperCase();
+
+                const wxAirports = [
+                    "VIDP",
+                    "VAAH",
+                    "LTFM",
+                    "LTAC",
+                    "LOWW",
+                    "UBBB",
+                    "UATE",
+                    "OIMM",
+                    "UZTT",
+                    "UTAA"
+                ];
+
+                const matchedAirport = wxAirports.find(icao =>
+                    token.includes(icao)
+                );
+
+                if (matchedAirport) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const startIndex = token.indexOf(matchedAirport);
+
+                    const charWidth = (item.width * scale) / token.length;
+
+                    const highlightX = tx + (startIndex * charWidth);
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+
+                    octx.fillRect(
+                        highlightX,
+                        ty - 12,
+                        charWidth * matchedAirport.length,
+                        18
+                    );
+
+                    octx.restore();
+                }
+            }
+
+            ///DESTINATION NOTAMS ANNOTATE
+            if (
+                pageNum >= notamStartPage &&
+                pageNum <= notamEndPage
+            ) {
+
+                const token = (item.str || "").trim().toUpperCase();
+
+                if (token.includes("DESTINATION AIRPORT")) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    octx.save();
+
+                    octx.font = "bold 24px Arial";
+                    octx.fillStyle = "red";
+
+                    octx.fillText(
+                        "DESTINATION NOTAMS",
+                        tx + (item.width * scale) + 20,
+                        ty
+                    );
+
+                    octx.restore();
+                }
+            }
+
+            ///NEXT
+
+
 
         }
+
+
+
+
+
+
+
+
+
+
+
 
         /* -----------------------------
         ANNOTATION (ONCE ONLY)
@@ -3116,30 +3601,30 @@ fileInput.addEventListener("change", async (e) => {
         if (pageNum === 1) {
 
             octx.fillStyle = "blue";
-            octx.font = "12px Helvetica";
+            octx.font = "10px Helvetica";
 
-            octx.fillText("VWS:", 798, 145);
+            octx.fillText("VWS:", 738, 145);
 
             let y = 160;
 
             for (const r of results) {
 
                 octx.fillText(
-                    `${r.before || "?"} : ${r.match}`,
-                    798,
+                    `${r.before2 || "?"} ${r.before5 || "?"} ${r.match}`,
+                    738,
                     y
                 );
 
-                y += 18;
+                y += 15;
             }
 
             y += 20
-            octx.fillText("CLB SCHED:", 798, y);
+            octx.fillText("CLB SCHED:", 738, y);
 
             y += 15
             for (const m of matches) {
-                octx.fillText(`FL${m.code} : ${m.value}`, 798, y);
-                y += 18;
+                octx.fillText(`FL${m.code} : ${m.value} ${m.waypointBefore}`, 738, y);
+                y += 15;
             }
         }
         ///Excess block time
@@ -3238,9 +3723,9 @@ fileInput.addEventListener("change", async (e) => {
         ///HIGH GROUND
         if (pageNum === 1) {
             octx.fillStyle = "blue";
-            octx.font = "12px Helvetica";
+            octx.font = "10px Helvetica";
 
-            octx.fillText("HIGH GROUND:", 650, 145);
+            octx.fillText("HIGH GROUND:", 620, 145);
 
             let y = 160;
 
@@ -3248,11 +3733,11 @@ fileInput.addEventListener("change", async (e) => {
 
                 octx.fillText(
                     `${c.before16 || "?"} | ${c.code} | ${c.before17 || "?"}`,
-                    650,
+                    620,
                     y
                 );
 
-                y += 18;
+                y += 15;
             }
 
         }
@@ -3434,6 +3919,117 @@ fileInput.addEventListener("change", async (e) => {
 
 
 
+        ///PAGE TITLES
+        ///ATC FLIGHT PLAN
+        if (pageNum === atcFlightPlanPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "ATC FLIGHT PLAN",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // ROUTE
+        if (pageNum === sidPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "ROUTE LEGS",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // EDTO
+        if (pageNum === edtoStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "EDTO INFORMATION",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // AIRPORT WEATHER
+        if (pageNum === airportWxStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "WEATHER/TAF",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+        
+        // NOTAMS
+        if (pageNum === notamStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "NOTAMS DEP/ARR",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // INTAMS
+        if (pageNum === crewBulletinStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "INTAMS",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        if (pageNum === pdf.numPages) {
+            const startY = 190;
+            const lineHeight = 20;
+
+            octx.font = "12px Helvetica";
+            octx.fillStyle = "blue";
+
+            bulletinAnnotations.forEach((m, idx) => {
+                octx.fillText(`${idx + 1}. ${m}`, 65, startY + idx * lineHeight);
+            });
+
+
+
+        }
 
 
         /// END
@@ -3466,7 +4062,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
         ]
     });
 
-    for (let p = 0; p < Math.min(2, renderedPages.length); p++) {
+    for (let p = 0; p < renderedPages.length; p++) {
 
         const page = renderedPages[p];
 
