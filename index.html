@@ -1533,6 +1533,8 @@ let wxOutputPage = null;
 let notamOutputPage = null;
 let crewOutputPage = null;
 let edtoOutputPage = null;
+let weatherChartsPage = null;
+let weatherChartsOutputPage = null;
 
 /* ----------------------------- */
 fileInput.addEventListener("change", async (e) => {
@@ -2507,7 +2509,26 @@ for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
     }
 }
 
+///WX CHARTS Page
+/* -----------------------------
+   WEATHER CHARTS PAGE
+----------------------------- */
+for (let p = 1; p <= pdf.numPages; p++) {
 
+    const page = await pdf.getPage(p);
+    const textContent = await page.getTextContent();
+
+    const text = textContent.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (text.includes("SECURITY STATUS")) {
+
+        weatherChartsPage = Math.min(p + 1, pdf.numPages);
+        break;
+    }
+}
 
 
 
@@ -2602,6 +2623,7 @@ if (crewBulletinStartPage !== null) {
 
 
 
+
 for (let i = 0; i < pagesToRender.length; i++) {
 
     const p = pagesToRender[i];
@@ -2628,6 +2650,11 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
     if (p === crewBulletinStartPage && crewOutputPage === null) {
         crewOutputPage = i + 1;
+    }
+
+    if (
+    p === weatherChartsPage && weatherChartsOutputPage === null) {
+        weatherChartsOutputPage = i + 1;
     }
 }
 
@@ -4118,6 +4145,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             tocY += 18;
             octx.fillText(`INTAMS`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`WX CHARTS`, 5, tocY);
         }
 
 
@@ -4204,6 +4234,12 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
             if (edtoOutputPage) {
                 pdf.link(5, 1073, 70, 15, {
                     pageNumber: edtoOutputPage
+                });
+            }
+
+            if (weatherChartsOutputPage) {
+                pdf.link(5, 1164, 70, 15, {
+                    pageNumber: weatherChartsOutputPage
                 });
             }
         }
