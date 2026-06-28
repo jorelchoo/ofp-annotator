@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v1.4</h2>
+    <h2>OFP Annotation Tool v1.5</h2>
 </div>
 
 <div class="upload">
@@ -4016,12 +4016,392 @@ const destWxLines = buildWeatherLines(
     destHazards
 );
 
+///DECOMPRESSION PROFILE FINDER
+//=====================================================
+// EXTRACT HIGH GROUND WAYPOINTS
+//=====================================================
+
+async function extractHighGroundWaypoints(ofpFile){
+
+    const pdf = await pdfjsLib.getDocument({
+        data: await ofpFile.arrayBuffer()
+    }).promise;
+
+    const waypoints = [];
+    const seen = new Set();
+
+    // Keep every page's token list so we can search it later
+    const pageWords = [];
+
+    //--------------------------------------------------
+    // PASS 1 - Extract all high ground waypoints
+    //--------------------------------------------------
+
+    for(let p = 5; p <= Math.min(20, pdf.numPages); p++){
+
+        const page = await pdf.getPage(p);
+        const textContent = await page.getTextContent();
+
+        const text = textContent.items.map(i => i.str).join(" ");
+        const words = text.split(/\s+/);
+
+        pageWords.push(words);
+
+        for(let i = 0; i < words.length; i++){
+
+            const token = words[i];
+
+            // Terrain code e.g. 111*0000
+            if(/\d{3}\*\d{4}/.test(token)){
+
+                const waypoint = words[i - 17];
+
+                if(
+                    waypoint &&
+                    /^[A-Z0-9]{2,6}$/.test(waypoint) &&
+                    !seen.has(waypoint)
+                ){
+
+                    seen.add(waypoint);
+                    waypoints.push(waypoint);
+
+                }
+            }
+        }
+    }
+
+    //--------------------------------------------------
+    // PASS 2 - Insert waypoint before each new segment
+    //--------------------------------------------------
+
+    const invalidWords = new Set([
+        "POSN","FREQ","ACTM","ZTM","ATA","AFL","ETA","OAT",
+        "ADN","AWIND","TAS","VWS","ZFRQ","AFRM","COORD",
+        "MSA","DIS","PFL","RETA","IMT","PDN","FWIND",
+        "GSP","DRM","PFRM","DIFF"
+    ]);
+
+    for(let k = 0; k < waypoints.length; k++){
+
+        const currentWaypoint = waypoints[k];
+
+        let previousWaypoint = null;
+
+        outer:
+
+        for(const words of pageWords){
+
+            for(let i = 0; i < words.length; i++){
+
+                if(words[i] !== currentWaypoint)
+                    continue;
+
+                // Walk backwards until we find a valid waypoint
+                for(let j = i - 1; j >= 0; j--){
+
+                    const token = words[j].replace(/^-/, "").trim();
+
+                    const validLength =
+                        token.length === 3 ||
+                        token.length === 5;
+
+                    const validLetters =
+                        /^[A-Z]+$/.test(token);
+
+                    if(
+                        validLength &&
+                        validLetters &&
+                        !invalidWords.has(token)
+                    ){
+                        previousWaypoint = token;
+                        break outer;
+                    }
+
+                }
+
+            }
+
+        }
+
+        if(
+            previousWaypoint &&
+            !waypoints.includes(previousWaypoint)
+        ){
+
+            console.log(
+                "Inserted",
+                previousWaypoint,
+                "before",
+                currentWaypoint
+            );
+
+            waypoints.splice(k,0,previousWaypoint);
+
+            k++;
+
+        }
+
+    }
+
+    console.log("High Ground Waypoints");
+    console.log(waypoints);
+
+    return waypoints;
+
+}
+
+//=====================================================
+// FIND DECOMPRESSION PROFILES
+//=====================================================
+
+async function findDecompressionProfiles(highGroundWaypoints){
+
+    const PDF_PATH = "./decompression_profiles.pdf";
+    const START_PAGE = 13;
+    const END_PAGE = 30;
+
+    const pdf = await pdfjsLib.getDocument(PDF_PATH).promise;
+
+    const matches = [];
+    const candidateRoutes = [];
+
+    //--------------------------------------------------
+    // Helpers
+    //--------------------------------------------------
+
+    function isRoute(token){
+
+        return /^[A-Z0-9]{2,6}\s+TO\s+[A-Z0-9]{2,6}$/.test(token);
+
+    }
+
+    function isProfile(token){
+
+        return (
+            /^[A-Z]{3,6}$/.test(token) ||
+            /^[A-Z]{3,6}\s*\(\d+\)$/.test(token)
+        );
+
+    }
+
+    function isAirway(token){
+
+        return (
+            token.includes("DCT") ||
+            token.includes(",") ||
+            /\b[A-Z]\d{2,3}\b/.test(token)
+        );
+
+    }
+
+    function profileMatchesWaypoint(profile, highGroundWaypoints){
+
+        const profileName =
+            profile.replace(/\s*\(\d+\)$/, "");
+
+        return highGroundWaypoints.includes(profileName);
+
+    }
+
+    function profileBaseName(profile){
+
+        return profile.replace(/\s*\(\d+\)$/, "");
+
+    }
+
+    //--------------------------------------------------
+    // PRIMARY ROUTE MATCH
+    //--------------------------------------------------
+
+    let waitingForProfile = false;
+    let currentRoute = "";
+
+    for(let p = START_PAGE; p <= END_PAGE; p++){
+
+        const page = await pdf.getPage(p);
+
+        const textContent = await page.getTextContent();
+
+        const tokens = textContent.items
+            .map(i => i.str.trim())
+            .filter(Boolean);
+
+        for(const token of tokens){
+
+            if(waitingForProfile){
+
+                if(isAirway(token))
+                    continue;
+
+                if(isProfile(token)){
+
+                    matches.push({
+                        route: currentRoute,
+                        profile: token,
+                        method: "ROUTE"
+                    });
+
+                    const r = candidateRoutes.find(
+                        x => x.route === currentRoute
+                    );
+
+                    if(r)
+                        r.found = true;
+
+                    waitingForProfile = false;
+                    currentRoute = "";
+
+                }
+
+                continue;
+
+            }
+
+            if(!isRoute(token))
+                continue;
+
+            const [start,,end] = token.split(/\s+/);
+
+            const startIndex =
+                highGroundWaypoints.indexOf(start);
+
+            const endIndex =
+                highGroundWaypoints.indexOf(end);
+
+            if(
+                startIndex !== -1 &&
+                endIndex !== -1 &&
+                startIndex < endIndex
+            ){
+
+                console.log("Route Match:", token);
+
+                currentRoute = token;
+
+                candidateRoutes.push({
+                    route: token,
+                    found: false
+                });
+
+                waitingForProfile = true;
+
+            }
+
+        }
+
+    }
+
+    //--------------------------------------------------
+    // FALLBACK PROFILE MATCH
+    //--------------------------------------------------
+
+    for(let p = START_PAGE; p <= END_PAGE; p++){
+
+        const page = await pdf.getPage(p);
+
+        const textContent = await page.getTextContent();
+
+        const tokens = textContent.items
+            .map(i => i.str.trim())
+            .filter(Boolean);
+
+        let lastRoute = null;
+
+        for(const token of tokens){
+
+            if(isRoute(token)){
+                lastRoute = token;
+                continue;
+            }
+
+            if(!isProfile(token))
+                continue;
+
+            if(!lastRoute)
+                continue;
+
+            if(!profileMatchesWaypoint(
+                token,
+                highGroundWaypoints
+            ))
+                continue;
+
+            const [start,,end] =
+                lastRoute.split(/\s+/);
+
+            const endpointMatches =
+                highGroundWaypoints.includes(start) ||
+                highGroundWaypoints.includes(end);
+
+            if(!endpointMatches)
+                continue;
+
+            const alreadyExists =
+                matches.some(m =>
+                    profileBaseName(m.profile) ===
+                    profileBaseName(token)
+                );
+
+            if(alreadyExists)
+                continue;
+
+            matches.push({
+
+                route: lastRoute,
+                profile: token,
+                method: "PROFILE"
+
+            });
+
+            console.log(
+                "Fallback Match:",
+                lastRoute,
+                "=>",
+                token
+            );
+
+        }
+
+    }
+
+    //--------------------------------------------------
+    // CHART NOT FOUND
+    //--------------------------------------------------
+
+    for(const r of candidateRoutes){
+
+        const exists =
+            matches.some(
+                m => m.route === r.route
+            );
+
+        if(!exists){
+
+            matches.push({
+
+                route: r.route,
+                profile: "Chart not found",
+                method: "NOT_FOUND"
+
+            });
+
+        }
+
+    }
+
+    console.log(matches);
+
+    return matches;
+
+}
 
 
 
+const highGroundWaypoints = await extractHighGroundWaypoints(fileInput.files[0]);
 
+const profiles = await findDecompressionProfiles(highGroundWaypoints);
 
-
+console.log(profiles);
 
 
 
@@ -5275,6 +5655,24 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 );
 
                 y += 15;
+            }
+
+            y += 20;
+
+            octx.fillText("DECOMP PROFILES:", 620, y);
+
+            y += 15;
+
+            for (const p of profiles) {
+
+                octx.fillText(
+                    `${p.route} -> ${p.profile}`,
+                    620,
+                    y
+                );
+
+                y += 15;
+
             }
 
         }
