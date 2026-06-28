@@ -60,6 +60,4011 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
+    <h2>OFP Annotation Tool v1.4</h2>
+</div>
+
+<div class="upload">
+    <input type="file" id="file" accept="application/pdf">
+    <button id="downloadBtn">Download Annotated PDF</button>
+</div>
+
+<div id="viewer"></div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+
+<script>
+
+///FIR DATABASE
+const FIR_DATA = [
+  {
+    "fir": "AGGG",
+    "name": "Honiara",
+    "country": "Solomon Islands"
+  },
+  {
+    "fir": "ANAU",
+    "name": "Nauru",
+    "country": "Nauru"
+  },
+  {
+    "fir": "AYPM",
+    "name": "Port Moresby",
+    "country": "Papua New Guinea"
+  },
+  {
+    "fir": "BGGL",
+    "name": "Nuuk",
+    "country": "Greenland ( Denmark)"
+  },
+  {
+    "fir": "BIRD",
+    "name": "Reykjavík",
+    "country": "Iceland"
+  },
+  {
+    "fir": "CZEG",
+    "name": "Edmonton",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZQM",
+    "name": "Moncton",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZQX",
+    "name": "Gander",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZQX",
+    "name": "Gander Oceanic",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZUL",
+    "name": "Montreal",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZVR",
+    "name": "Vancouver",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZWG",
+    "name": "Winnipeg",
+    "country": "Canada"
+  },
+  {
+    "fir": "CZYZ",
+    "name": "Toronto",
+    "country": "Canada"
+  },
+  {
+    "fir": "DAAA",
+    "name": "Alger",
+    "country": "Algeria"
+  },
+  {
+    "fir": "DGAC",
+    "name": "Accra",
+    "country": "Benin/ Ghana/ Togo"
+  },
+  {
+    "fir": "DIII",
+    "name": "Dakar",
+    "country": "Ivory Coast"
+  },
+  {
+    "fir": "DNKK",
+    "name": "Kano",
+    "country": "Nigeria"
+  },
+  {
+    "fir": "DRRR",
+    "name": "Niamey",
+    "country": "Benin/ Burkina Faso/ Mali/ Niger"
+  },
+  {
+    "fir": "DTTC",
+    "name": "Tunis",
+    "country": "Tunisia"
+  },
+  {
+    "fir": "EBBU",
+    "name": "Bruxelles",
+    "country": "Belgium/ Luxembourg"
+  },
+  {
+    "fir": "EBUR",
+    "name": "Maastricht",
+    "country": "Belgium/ Luxembourg"
+  },
+  {
+    "fir": "EDGG",
+    "name": "Langen",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDMM",
+    "name": "München",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDUU",
+    "name": "Rhein UIR",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDVV",
+    "name": "Maastricht",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDWW",
+    "name": "Bremen",
+    "country": "Germany"
+  },
+  {
+    "fir": "EDYY",
+    "name": "IFPZ (Eurocontrol)",
+    "country": "Belgium/ Germany/ Netherlands"
+  },
+  {
+    "fir": "EETT",
+    "name": "Tallinn",
+    "country": "Estonia"
+  },
+  {
+    "fir": "EFIN",
+    "name": "Finland",
+    "country": "Finland"
+  },
+  {
+    "fir": "EGGX",
+    "name": "Shanwick Oceanic",
+    "country": "United Kingdom/ Ireland"
+  },
+  {
+    "fir": "EGPX",
+    "name": "Scottish",
+    "country": "United Kingdom"
+  },
+  {
+    "fir": "EGQQ",
+    "name": "Scottish",
+    "country": "United Kingdom"
+  },
+  {
+    "fir": "EGTT",
+    "name": "London",
+    "country": "United Kingdom"
+  },
+  {
+    "fir": "EHAA",
+    "name": "Amsterdam",
+    "country": "Netherlands"
+  },
+  {
+    "fir": "EISN",
+    "name": "Shannon",
+    "country": "Ireland"
+  },
+  {
+    "fir": "EKDK",
+    "name": "København",
+    "country": "Denmark"
+  },
+  {
+    "fir": "ENOB",
+    "name": "Bodo",
+    "country": "Norway"
+  },
+  {
+    "fir": "ENOR",
+    "name": "Norway",
+    "country": "Norway"
+  },
+  {
+    "fir": "EPWW",
+    "name": "Warsawa",
+    "country": "Poland"
+  },
+  {
+    "fir": "ESAA",
+    "name": "Sweden",
+    "country": "Sweden"
+  },
+  {
+    "fir": "ESMM",
+    "name": "Sweden",
+    "country": "Sweden"
+  },
+  {
+    "fir": "EVRR",
+    "name": "Riga",
+    "country": "Latvia"
+  },
+  {
+    "fir": "EYVL",
+    "name": "Vilnius",
+    "country": "Lithuania"
+  },
+  {
+    "fir": "FACA",
+    "name": "Capetown",
+    "country": "South Africa"
+  },
+  {
+    "fir": "FAJO",
+    "name": "Johannesburg Oceanic",
+    "country": "South Africa"
+  },
+  {
+    "fir": "FAJA",
+    "name": "Johannesburg",
+    "country": "Lesotho/ South Africa/ Swaziland"
+  },
+  {
+    "fir": "FBGR",
+    "name": "Gaborone",
+    "country": "Botswana"
+  },
+  {
+    "fir": "FCCC",
+    "name": "Brazzaville",
+    "country": "Cameroon/ Central African Republic/ Congo/ Equatorial Guinea/ Gabon/ Sao Tome and Principe"
+  },
+  {
+    "fir": "FIMM",
+    "name": "Mauritius",
+    "country": "Mauritius"
+  },
+  {
+    "fir": "FLFI",
+    "name": "Zambia",
+    "country": "Zambia"
+  },
+  {
+    "fir": "FMMM",
+    "name": "Antananarivo",
+    "country": "Madagascar"
+  },
+  {
+    "fir": "FNAN",
+    "name": "Luanda",
+    "country": "Angola"
+  },
+  {
+    "fir": "FOOO",
+    "name": "Libreville",
+    "country": "Gabon"
+  },
+  {
+    "fir": "FQBE",
+    "name": "Beira",
+    "country": "Mozambique"
+  },
+  {
+    "fir": "FSSS",
+    "name": "Seychelles",
+    "country": "Seychelles"
+  },
+  {
+    "fir": "FTTT",
+    "name": "N'Djamena",
+    "country": "Cameroon/ Central African Republic/ Chad"
+  },
+  {
+    "fir": "FVHF",
+    "name": "Harare",
+    "country": "Zimbabwe"
+  },
+  {
+    "fir": "FWLL",
+    "name": "Lilongwe",
+    "country": "Malawi"
+  },
+  {
+    "fir": "FYWF",
+    "name": "Windhoek",
+    "country": "Namibia"
+  },
+  {
+    "fir": "FZZA",
+    "name": "Kinshasa",
+    "country": "Congo, Democratic Republic of the"
+  },
+  {
+    "fir": "GCCC",
+    "name": "Canarias",
+    "country": "Canary Islands ( Spain)/ Western Sahara"
+  },
+  {
+    "fir": "GLRB",
+    "name": "Roberts",
+    "country": "Guinea/ Liberia/ Sierra Leone"
+  },
+  {
+    "fir": "GMMM",
+    "name": "Casablanca",
+    "country": "Morocco"
+  },
+  {
+    "fir": "GOOO",
+    "name": "Dakar",
+    "country": "Ivory Coast/ Gambia/ Mali/ Mauritania/ Senegal"
+  },
+  {
+    "fir": "GVSC",
+    "name": "Sal Oceanic",
+    "country": "Cape Verde"
+  },
+  {
+    "fir": "HAAA",
+    "name": "Addis Ababa",
+    "country": "Ethiopia"
+  },
+  {
+    "fir": "HBBA",
+    "name": "Bujumbura",
+    "country": "Burundi"
+  },
+  {
+    "fir": "HCSM",
+    "name": "Mogadishu",
+    "country": "Somalia"
+  },
+  {
+    "fir": "HECC",
+    "name": "Cairo",
+    "country": "Egypt"
+  },
+  {
+    "fir": "HHAA",
+    "name": "Asmara",
+    "country": "Eritrea"
+  },
+  {
+    "fir": "HKNA",
+    "name": "Nairobi",
+    "country": "Kenya"
+  },
+  {
+    "fir": "HLLL",
+    "name": "Tripoli",
+    "country": "Libya"
+  },
+  {
+    "fir": "HRYR",
+    "name": "Kigali",
+    "country": "Rwanda"
+  },
+  {
+    "fir": "HSSX",
+    "name": "Khartoum",
+    "country": "Sudan"
+  },
+  {
+    "fir": "HTDC",
+    "name": "Dar es-Salaam",
+    "country": "Tanzania"
+  },
+  {
+    "fir": "HUEC",
+    "name": "Entebbe",
+    "country": "Uganda"
+  },
+  {
+    "fir": "IFPS",
+    "name": "IFPZ (Eurocontrol)",
+    "country": "Eurocontrol"
+  },
+  {
+    "fir": "KZAB",
+    "name": "Albuquerque",
+    "country": "United States"
+  },
+  {
+    "fir": "KZAK",
+    "name": "Oakland Oceanic",
+    "country": "Micronesia/ Marshall Islands/ Palau/ United States"
+  },
+  {
+    "fir": "KZAU",
+    "name": "Chicago",
+    "country": "United States"
+  },
+  {
+    "fir": "KZBW",
+    "name": "Boston",
+    "country": "United States"
+  },
+  {
+    "fir": "KZDC",
+    "name": "Washington",
+    "country": "United States"
+  },
+  {
+    "fir": "KZDV",
+    "name": "Denver",
+    "country": "United States"
+  },
+  {
+    "fir": "KZFW",
+    "name": "Fort Worth",
+    "country": "United States"
+  },
+  {
+    "fir": "KZHU",
+    "name": "Houston",
+    "country": "United States"
+  },
+  {
+    "fir": "KZHU",
+    "name": "Houston Oceanic",
+    "country": "United States"
+  },
+  {
+    "fir": "KZID",
+    "name": "Indianapolis",
+    "country": "United States"
+  },
+  {
+    "fir": "KZJX",
+    "name": "Jacksonville",
+    "country": "United States"
+  },
+  {
+    "fir": "KZKC",
+    "name": "Kansas City",
+    "country": "United States"
+  },
+  {
+    "fir": "KZLA",
+    "name": "Los Angeles",
+    "country": "United States"
+  },
+  {
+    "fir": "KZLC",
+    "name": "Salt Lake",
+    "country": "United States"
+  },
+  {
+    "fir": "KZMA",
+    "name": "Miami",
+    "country": "United States"
+  },
+  {
+    "fir": "KZMA",
+    "name": "Miami Oceanic",
+    "country": "Turks and Caicos ( United Kingdom)/ United States"
+  },
+  {
+    "fir": "KZME",
+    "name": "Memphis",
+    "country": "United States"
+  },
+  {
+    "fir": "KZMP",
+    "name": "Minneapolis",
+    "country": "United States"
+  },
+  {
+    "fir": "KZNY",
+    "name": "New York",
+    "country": "United States"
+  },
+  {
+    "fir": "KZOA",
+    "name": "Oakland (En route)",
+    "country": "United States"
+  },
+  {
+    "fir": "KZOB",
+    "name": "Cleveland",
+    "country": "United States"
+  },
+  {
+    "fir": "KZSE",
+    "name": "Seattle",
+    "country": "United States"
+  },
+  {
+    "fir": "KZTL",
+    "name": "Atlanta",
+    "country": "United States"
+  },
+  {
+    "fir": "KZWY",
+    "name": "New York Oceanic",
+    "country": "Bermuda ( United Kingdom)/ United States"
+  },
+  {
+    "fir": "LAAA",
+    "name": "Tirana",
+    "country": "Albania"
+  },
+  {
+    "fir": "LBSR",
+    "name": "Sofia",
+    "country": "Bulgaria"
+  },
+  {
+    "fir": "LCCC",
+    "name": "Nicosia",
+    "country": "Cyprus"
+  },
+  {
+    "fir": "LDZO",
+    "name": "Zagreb",
+    "country": "Croatia"
+  },
+  {
+    "fir": "LECB",
+    "name": "Barcelona",
+    "country": "Spain"
+  },
+  {
+    "fir": "LECM",
+    "name": "Madrid",
+    "country": "Spain"
+  },
+  {
+    "fir": "LECS",
+    "name": "Sevilla",
+    "country": "Spain"
+  },
+  {
+    "fir": "LFBB",
+    "name": "Bordeaux",
+    "country": "France"
+  },
+  {
+    "fir": "LFEE",
+    "name": "Reims",
+    "country": "France"
+  },
+  {
+    "fir": "LFFF",
+    "name": "Paris",
+    "country": "France"
+  },
+  {
+    "fir": "LFMM",
+    "name": "Marseille",
+    "country": "France"
+  },
+  {
+    "fir": "LFRR",
+    "name": "Brest",
+    "country": "France"
+  },
+  {
+    "fir": "LGGG",
+    "name": "Athens",
+    "country": "Greece"
+  },
+  {
+    "fir": "LHCC",
+    "name": "Budapest",
+    "country": "Hungary"
+  },
+  {
+    "fir": "LIBB",
+    "name": "Brindisi",
+    "country": "Italy"
+  },
+  {
+    "fir": "LIMM",
+    "name": "Milano",
+    "country": "Italy"
+  },
+  {
+    "fir": "LIRR",
+    "name": "Roma",
+    "country": "Italy"
+  },
+  {
+    "fir": "LJLA",
+    "name": "Ljubljana",
+    "country": "Slovenia"
+  },
+  {
+    "fir": "LKAA",
+    "name": "Praha",
+    "country": "Czech Republic"
+  },
+  {
+    "fir": "LLLL",
+    "name": "Tel-Aviv",
+    "country": "Israel"
+  },
+  {
+    "fir": "LMMM",
+    "name": "Malta",
+    "country": "Malta"
+  },
+  {
+    "fir": "LOVV",
+    "name": "Wien",
+    "country": "Austria"
+  },
+  {
+    "fir": "LPPC",
+    "name": "Lisboa",
+    "country": "Portugal"
+  },
+  {
+    "fir": "LPPO",
+    "name": "Santa Maria",
+    "country": "Azores ( Portugal)"
+  },
+  {
+    "fir": "LQSB",
+    "name": "Sarajevo",
+    "country": "Bosnia and Herzegovina"
+  },
+  {
+    "fir": "LRBB",
+    "name": "Bucureşti",
+    "country": "Romania"
+  },
+  {
+    "fir": "LSAG",
+    "name": "Geneve",
+    "country": "Switzerland"
+  },
+  {
+    "fir": "LSAS",
+    "name": "Switzerland",
+    "country": "Switzerland"
+  },
+  {
+    "fir": "LSAZ",
+    "name": "Zurich",
+    "country": "Switzerland"
+  },
+  {
+    "fir": "LTAA",
+    "name": "Ankara",
+    "country": "Turkey"
+  },
+  {
+    "fir": "LTBB",
+    "name": "Istanbul",
+    "country": "Turkey"
+  },
+  {
+    "fir": "LUUU",
+    "name": "Chisinau",
+    "country": "Moldova"
+  },
+  {
+    "fir": "LWSS",
+    "name": "Skopje",
+    "country": "North Macedonia"
+  },
+  {
+    "fir": "LYBA",
+    "name": "Beograd",
+    "country": "Serbia"
+  },
+  {
+    "fir": "LZBB",
+    "name": "Bratislava",
+    "country": "Slovakia"
+  },
+  {
+    "fir": "MDCS",
+    "name": "Santo Domingo",
+    "country": "Dominican Republic"
+  },
+  {
+    "fir": "MHCC",
+    "name": "Central American",
+    "country": "Belize/ Costa Rica/ El Salvador/ Guatemala/ Honduras/ Nicaragua"
+  },
+  {
+    "fir": "MKJK",
+    "name": "Kingston",
+    "country": "Jamaica"
+  },
+  {
+    "fir": "MMFO",
+    "name": "Mazatlan Oceanic",
+    "country": "Mexico"
+  },
+  {
+    "fir": "MMFR",
+    "name": "Mexico",
+    "country": "Mexico"
+  },
+  {
+    "fir": "MPZL",
+    "name": "Panama",
+    "country": "Panama"
+  },
+  {
+    "fir": "MTEG",
+    "name": "Port-au-Prince",
+    "country": "Haiti"
+  },
+  {
+    "fir": "MUFH",
+    "name": "Habana",
+    "country": "Cuba"
+  },
+  {
+    "fir": "MYNA",
+    "name": "Nassau",
+    "country": "Bahamas"
+  },
+  {
+    "fir": "NFFF",
+    "name": "Fiji",
+    "country": "New Caledonia ( France)"
+  },
+  {
+    "fir": "NFFF",
+    "name": "Nadi",
+    "country": "Fiji/ Kiribati/ Vanuatu"
+  },
+  {
+    "fir": "NTTT",
+    "name": "Tahiti",
+    "country": "French Polynesia ( France)"
+  },
+  {
+    "fir": "NZZC",
+    "name": "New Zealand",
+    "country": "New Zealand"
+  },
+  {
+    "fir": "NZZO",
+    "name": "Auckland Oceanic",
+    "country": "New Zealand"
+  },
+  {
+    "fir": "OAKX",
+    "name": "Kabul",
+    "country": "Afghanistan"
+  },
+  {
+    "fir": "OBBB",
+    "name": "Bahrain",
+    "country": "Bahrain"
+  },
+  {
+    "fir": "OEJD",
+    "name": "Jeddah",
+    "country": "Saudi Arabia"
+  },
+  {
+    "fir": "OIIX",
+    "name": "Tehran",
+    "country": "Iran"
+  },
+  {
+    "fir": "OJAC",
+    "name": "Amman",
+    "country": "Jordan"
+  },
+  {
+    "fir": "OKAC",
+    "name": "Kuwait",
+    "country": "Kuwait"
+  },
+  {
+    "fir": "OLBB",
+    "name": "Beirut",
+    "country": "Lebanon"
+  },
+  {
+    "fir": "OMAE",
+    "name": "Emirates",
+    "country": "United Arab Emirates"
+  },
+  {
+    "fir": "OOMM",
+    "name": "Muscat",
+    "country": "Oman"
+  },
+  {
+    "fir": "OPKR",
+    "name": "Karachi",
+    "country": "Pakistan"
+  },
+  {
+    "fir": "OPLR",
+    "name": "Lahore",
+    "country": "Pakistan"
+  },
+  {
+    "fir": "ORBB",
+    "name": "Baghdad",
+    "country": "Iraq"
+  },
+  {
+    "fir": "OSTT",
+    "name": "Damascus",
+    "country": "Syria"
+  },
+  {
+    "fir": "OYSC",
+    "name": "Sanaa",
+    "country": "Yemen"
+  },
+  {
+    "fir": "PAZA",
+    "name": "Anchorage Continental",
+    "country": "United States"
+  },
+  {
+    "fir": "PAZN",
+    "name": "Anchorage Oceanic",
+    "country": "United States"
+  },
+  {
+    "fir": "PHZH",
+    "name": "Honolulu",
+    "country": "United States"
+  },
+  {
+    "fir": "RCAA",
+    "name": "Taibei",
+    "country": "Taiwan"
+  },
+  {
+    "fir": "RJBE",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJCG",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJFF",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJJJ",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RJTG",
+    "name": "Fukuoka",
+    "country": "Japan"
+  },
+  {
+    "fir": "RKRR",
+    "name": "Incheon",
+    "country": "South Korea"
+  },
+  {
+    "fir": "RPHI",
+    "name": "Manila",
+    "country": "Philippines"
+  },
+  {
+    "fir": "SACF",
+    "name": "Cordoba",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SACU",
+    "name": "Cordoba UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAEF",
+    "name": "Ezeiza",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAEU",
+    "name": "Ezeiza UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAMF",
+    "name": "Mendoza",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAMV",
+    "name": "Mendoza UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SARR",
+    "name": "Resistencia",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAVF",
+    "name": "Comodoro Rivadavia",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SAVU",
+    "name": "Comodoro Rivadavia UIR[citation needed]",
+    "country": "Argentina"
+  },
+  {
+    "fir": "SBAO",
+    "name": "Atlantico",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBAZ",
+    "name": "Amazonica",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBBS",
+    "name": "Brasilia",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBCW",
+    "name": "Curitiba",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SBRE",
+    "name": "Recife",
+    "country": "Brazil"
+  },
+  {
+    "fir": "SCCZ",
+    "name": "Punta Arenas",
+    "country": "Chile"
+  },
+  {
+    "fir": "SCEZ",
+    "name": "Santiago",
+    "country": "Chile"
+  },
+  {
+    "fir": "SCFZ",
+    "name": "Antofagasta",
+    "country": "Chile"
+  },
+  {
+    "fir": "SCIZ",
+    "name": "Easter Island",
+    "country": "Easter Island ( Chile)"
+  },
+  {
+    "fir": "SCTZ",
+    "name": "Puerto Montt",
+    "country": "Chile"
+  },
+  {
+    "fir": "SEFG",
+    "name": "Guayaquil",
+    "country": "Ecuador"
+  },
+  {
+    "fir": "SGFA",
+    "name": "Asuncion",
+    "country": "Paraguay"
+  },
+  {
+    "fir": "SKEC",
+    "name": "Barranquilla",
+    "country": "Colombia"
+  },
+  {
+    "fir": "SKED",
+    "name": "Bogota",
+    "country": "Colombia"
+  },
+  {
+    "fir": "SLLF",
+    "name": "La Paz",
+    "country": "Bolivia"
+  },
+  {
+    "fir": "SMPM",
+    "name": "Paramaribo",
+    "country": "Suriname"
+  },
+  {
+    "fir": "SOOO",
+    "name": "Rochambeau",
+    "country": "French Guiana ( France)"
+  },
+  {
+    "fir": "SPIM",
+    "name": "Lima",
+    "country": "Peru"
+  },
+  {
+    "fir": "SUEO",
+    "name": "Montevideo",
+    "country": "Uruguay"
+  },
+  {
+    "fir": "SVZM",
+    "name": "Maiquetia",
+    "country": "Venezuela"
+  },
+  {
+    "fir": "SYGC",
+    "name": "Georgetown",
+    "country": "Guyana"
+  },
+  {
+    "fir": "TJZS",
+    "name": "San Juan",
+    "country": "Anguilla ( United Kingdom)/ British Virgin Islands ( United Kingdom)/ Puerto Rico ( United States)/ Sint Maarten ( Netherlands)"
+  },
+  {
+    "fir": "TNCF",
+    "name": "Curaçao",
+    "country": "Aruba/ Curaçao ( Netherlands)/ Caribbean Netherlands ( Netherlands)"
+  },
+  {
+    "fir": "TTZP",
+    "name": "Piarco",
+    "country": "Barbados/ Dominica/ Grenada/ Guadeloupe ( France)/ Saint Kitts and Nevis/ Saint Lucia/ Trinidad and Tobago/ Saint Vincent and the Grenadines"
+  },
+  {
+    "fir": "UAAA",
+    "name": "Almaty",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UACN",
+    "name": "Astana",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UAII",
+    "name": "Shymkent",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UATT",
+    "name": "Aktobe",
+    "country": "Kazakhstan"
+  },
+  {
+    "fir": "UBBA",
+    "name": "Baku",
+    "country": "Azerbaijan"
+  },
+  {
+    "fir": "UCFM",
+    "name": "Bishkek",
+    "country": "Kyrgyzstan"
+  },
+  {
+    "fir": "UCFO",
+    "name": "Osh",
+    "country": "Kyrgyzstan"
+  },
+  {
+    "fir": "UDDD",
+    "name": "Yerevan",
+    "country": "Armenia"
+  },
+  {
+    "fir": "UEEE",
+    "name": "Yakutsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UGGG",
+    "name": "Tbilisi",
+    "country": "Georgia"
+  },
+  {
+    "fir": "UHHH",
+    "name": "Khabarovsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UHMM",
+    "name": "Magadan",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UHPP",
+    "name": "Petropavlovsk-Kamchatsky",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UIII",
+    "name": "Irkutsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UKBV",
+    "name": "Kyiv",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "UKDV",
+    "name": "Dnipro",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "UKFV",
+    "name": "Simferopol",
+    "country": "Ukraine (de-jure)/ Russian Federation (de-facto)"
+  },
+  {
+    "fir": "UKLV",
+    "name": "Lviv",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "UKOV",
+    "name": "Odesa",
+    "country": "Ukraine"
+  },
+  {
+    "fir": "ULLL",
+    "name": "Sankt-Peterburg",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UMKK",
+    "name": "Kaliningrad",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UMMV",
+    "name": "Minsk",
+    "country": "Belarus"
+  },
+  {
+    "fir": "UNKL",
+    "name": "Krasnoyarsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UNNT",
+    "name": "Novosibirsk",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "URRV",
+    "name": "Rostov-Na-Donu",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "USSV",
+    "name": "Yekaterinburg",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "USTV",
+    "name": "Tyumen",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UTAA",
+    "name": "Ashgabat",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTAK",
+    "name": "Turkmenbashi",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTAT",
+    "name": "Dashoguz",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTAV",
+    "name": "Turkmenabat",
+    "country": "Turkmenistan"
+  },
+  {
+    "fir": "UTDD",
+    "name": "Dushanbe",
+    "country": "Tajikistan"
+  },
+  {
+    "fir": "UTSD",
+    "name": "Samarkand",
+    "country": "Uzbekistan"
+  },
+  {
+    "fir": "UTTR",
+    "name": "Tashkent",
+    "country": "Uzbekistan"
+  },
+  {
+    "fir": "UUWV",
+    "name": "Moscow",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "UWWW",
+    "name": "Samara",
+    "country": "Russian Federation"
+  },
+  {
+    "fir": "VABF",
+    "name": "Mumbai",
+    "country": "India"
+  },
+  {
+    "fir": "VCCC",
+    "name": "Colombo",
+    "country": "Sri Lanka"
+  },
+  {
+    "fir": "VDPF",
+    "name": "Phnom Penh",
+    "country": "Cambodia"
+  },
+  {
+    "fir": "VECF",
+    "name": "Kolkata",
+    "country": "Bhutan/ India"
+  },
+  {
+    "fir": "VGFR",
+    "name": "Dhaka",
+    "country": "Bangladesh"
+  },
+  {
+    "fir": "VHHK",
+    "name": "Hong Kong",
+    "country": "Hong Kong"
+  },
+  {
+    "fir": "VIDF",
+    "name": "Delhi",
+    "country": "India"
+  },
+  {
+    "fir": "VLVT",
+    "name": "Vientiane",
+    "country": "Laos"
+  },
+  {
+    "fir": "VNSM",
+    "name": "Kathmandu",
+    "country": "Nepal"
+  },
+  {
+    "fir": "VOMF",
+    "name": "Chennai",
+    "country": "India"
+  },
+  {
+    "fir": "VRMF",
+    "name": "Male",
+    "country": "Maldives"
+  },
+  {
+    "fir": "VTBB",
+    "name": "Bangkok",
+    "country": "Thailand"
+  },
+  {
+    "fir": "VVHM",
+    "name": "Ho Chi Minh",
+    "country": "Vietnam"
+  },
+  {
+    "fir": "VVHN",
+    "name": "Hanoi",
+    "country": "Vietnam"
+  },
+  {
+    "fir": "VYYF",
+    "name": "Yangon",
+    "country": "Myanmar"
+  },
+  {
+    "fir": "WAAF",
+    "name": "Ujung Pandang",
+    "country": "Indonesia/ Timor Leste"
+  },
+  {
+    "fir": "WBFC",
+    "name": "Kota Kinabalu",
+    "country": "Brunei/ Malaysia"
+  },
+  {
+    "fir": "WIIF",
+    "name": "Jakarta",
+    "country": "Indonesia"
+  },
+  {
+    "fir": "WMFC",
+    "name": "Kuala Lumpur",
+    "country": "Malaysia"
+  },
+  {
+    "fir": "WSJC",
+    "name": "Singapore",
+    "country": "Singapore"
+  },
+  {
+    "fir": "YBBB",
+    "name": "Brisbane",
+    "country": "Australia"
+  },
+  {
+    "fir": "YMMM",
+    "name": "Melbourne",
+    "country": "Australia"
+  },
+  {
+    "fir": "ZBPE",
+    "name": "Beijing",
+    "country": "China"
+  },
+  {
+    "fir": "ZGZU",
+    "name": "Guangzhou",
+    "country": "China"
+  },
+  {
+    "fir": "ZHWH",
+    "name": "Wuhan",
+    "country": "China"
+  },
+  {
+    "fir": "ZJSA",
+    "name": "Sanya",
+    "country": "China"
+  },
+  {
+    "fir": "ZKKP",
+    "name": "Pyongyang",
+    "country": "North Korea"
+  },
+  {
+    "fir": "ZLHW",
+    "name": "Lanzhou",
+    "country": "China"
+  },
+  {
+    "fir": "ZMUB",
+    "name": "Ulaanbaatar",
+    "country": "Mongolia"
+  },
+  {
+    "fir": "ZPKM",
+    "name": "Kunming",
+    "country": "China"
+  },
+  {
+    "fir": "ZSHA",
+    "name": "Shanghai",
+    "country": "China"
+  },
+  {
+    "fir": "ZWUQ",
+    "name": "Urumqi",
+    "country": "China"
+  },
+  {
+    "fir": "ZYSH",
+    "name": "Shenyang",
+    "country": "China"
+  }
+];
+
+window.addEventListener("error", (e) => {
+    alert(e.message);
+});
+
+pdfjsLib.GlobalWorkerOptions.workerSrc =
+  "https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.worker.min.js";
+
+
+const fileInput = document.getElementById("file");
+const viewer = document.getElementById("viewer");
+
+const renderedPages = [];
+
+///FIR extraction from LEGS
+let firLookup = new Map();
+
+function initFIRDatabase() {
+    firLookup = new Map(
+        FIR_DATA.map(item => [
+            item.fir.trim().toUpperCase(),
+            {
+                name: item.name,
+                country: item.country
+            }
+        ])
+    );
+}
+
+initFIRDatabase();
+
+function getFIRInfo(code) {
+    const key = (code || "").trim().toUpperCase();
+    return firLookup.get(key) || { name: "", country: "" };
+}
+
+/* -----------------------------
+   TIME DIFFERENCE (HH:MM)
+----------------------------- */
+function diffHM(dep, arr) {
+
+    const dH = parseInt(dep.slice(0,2), 10);
+    const dM = parseInt(dep.slice(2,4), 10);
+
+    const aH = parseInt(arr.slice(0,2), 10);
+    const aM = parseInt(arr.slice(2,4), 10);
+
+    let total = (aH * 60 + aM) - (dH * 60 + dM);
+
+    if (total < 0) total += 1440;
+
+    return {
+        hours: Math.floor(total / 60),
+        mins: total % 60
+    };
+}
+
+///NOTAM DATE FUNCTION
+function parseNotamDate(dateStr, timeStr) {
+
+    const months = {
+        JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,
+        JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11
+    };
+
+    const day = parseInt(dateStr.slice(0,2));
+    const mon = months[dateStr.slice(3,6)];
+    const year = 2000 + parseInt(dateStr.slice(7,9));
+
+    const hour = parseInt(timeStr.slice(0,2));
+    const min = parseInt(timeStr.slice(2,4));
+
+    // UTC
+    return new Date(Date.UTC(year, mon, day, hour, min));
+}
+
+function makeFlightDate(dateStr, timeStr) {
+
+    const months = {
+        JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
+        JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11
+    };
+
+    // Support both:
+    // 24MAR26
+    // 24-MAR-26
+    const clean = dateStr.replace(/-/g, "").toUpperCase();
+
+    const day = parseInt(clean.slice(0, 2));
+    const month = months[clean.slice(2, 5)];
+    const year = 2000 + parseInt(clean.slice(5, 7));
+
+    const hour = parseInt(timeStr.slice(0, 2));
+    const minute = parseInt(timeStr.slice(2, 4));
+
+    return new Date(Date.UTC(year, month, day, hour, minute));
+}
+
+function makeWeatherDate(baseDate, value) {
+
+    const day = parseInt(value.slice(0, 2));
+
+    let hour = 0;
+    let minute = 0;
+
+    if (value.length === 6) {
+        // DDHHMM
+        hour = parseInt(value.slice(2, 4));
+        minute = parseInt(value.slice(4, 6));
+    }
+    else if (value.length === 4) {
+        // DDHH
+        hour = parseInt(value.slice(2, 4));
+    }
+    else {
+        return null;
+    }
+
+    // Start with flight month/year
+    const d = new Date(Date.UTC(
+        baseDate.getUTCFullYear(),
+        baseDate.getUTCMonth(),
+        day,
+        hour,
+        minute,
+        0,
+        0
+    ));
+
+    // Difference from flight date
+    const diffDays =
+        (d - baseDate) / (1000 * 60 * 60 * 24);
+
+    // More than ~half a month ahead?
+    if (diffDays > 15) {
+        d.setUTCMonth(d.getUTCMonth() - 1);
+    }
+
+    // More than ~half a month behind?
+    if (diffDays < -15) {
+        d.setUTCMonth(d.getUTCMonth() + 1);
+    }
+
+    return d;
+}
+
+///NOTAM KEYWORDS
+function matchesGroup(text, group) {
+    return group.some(k => text.includes(k));
+}
+
+///DECLARED VARIABLES OUT OF LOOP
+let dep = "";
+let arr = "";
+let date = "";
+
+let sidOutputPage = null;
+let atcOutputPage = null;
+let wxOutputPage = null;
+let notamOutputPage = null;
+let crewOutputPage = null;
+let edtoOutputPage = null;
+let weatherChartsPage = null;
+let weatherChartsOutputPage = null;
+
+let extractedNotams = [];
+let notamDepTime = null;
+let notamArrTime = null;
+
+/* ----------------------------- */
+fileInput.addEventListener("change", async (e) => {
+
+    const file = e.target.files[0];
+    if (!file) return;
+
+    viewer.innerHTML = "";
+
+    const buffer = await file.arrayBuffer();
+    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+
+    const scale = 1.5;
+
+    let sidLine = null;
+    let starLine = null;  
+
+    ///VWS extraction
+    const targetSet = new Set([
+        "004","005","006","007","008","009",
+        "010","011","012","013","014","015",
+        "016","017","018","019"
+        ]);
+
+        const results = [];
+
+        /* -----------------------------
+        SCAN PAGES 5 → 20
+        ----------------------------- */
+        for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+            const page = await pdf.getPage(p);
+            const textContent = await page.getTextContent();
+
+            const tokens = textContent.items.map(i => i.str);
+
+            for (let i = 0; i < tokens.length; i++) {
+
+                const token = tokens[i];
+
+                if (targetSet.has(token)) {
+
+                    const before2 = tokens[i - 2] || null;
+                    const before5 = tokens[i - 4] || null;
+
+                    results.push({
+                        page: p,
+                        before2: before2 ? before2.slice(0, 5) : null,
+                        before5: before5,
+                        match: token
+                    });
+                }
+            }
+        }
+
+    let codeList = [];
+
+    codeList = [];
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ");
+
+        const wordList = text.split(/\s+/);
+
+        for (let i = 0; i < wordList.length; i++) {
+
+            const item = wordList[i];
+
+            const valid =
+                item.length === 8 &&
+                item[3] === "*" &&
+                /^\d{3}$/.test(item.slice(0, 3));
+
+            if (valid) {
+                codeList.push({
+                    code: item.slice(0, 4),
+                    before16: wordList[i - 16] || null,
+                    before17: wordList[i - 17] || null
+                });
+            }
+        }
+    }
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const pg = await pdf.getPage(p);
+        const tc = await pg.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ");
+
+        if (!sidLine) {
+            const sidRaw = text.match(/SID:\s*([^\n]+)/i)?.[1]?.trim();
+
+            if (sidRaw) {
+                sidLine = sidRaw.split(/\s+/).slice(0, 3).join(" ");
+            }
+        }
+
+        if (!starLine) {
+            const starRaw = text.match(/STAR:\s*([^\n]+)/i)?.[1]?.trim();
+
+            if (starRaw) {
+                starLine = starRaw.split(/\s+/).slice(0, 3).join(" ");
+            }
+        }
+
+        if (sidLine && starLine) break;
+    }
+
+    ///RTOW extraction
+    let rtow = null;
+
+    for (let p = 2; p <= Math.min(4, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ");
+
+        const rtowMatch = text.match(/RTOW\s*(?!\()[^\d]*(\d{6})/i);
+
+        if (rtowMatch) {
+            rtow = (Math.floor(Number(rtowMatch[1]) / 100) * 100) / 1000;
+            break; // stop once found
+        }
+    }
+
+    ///CLB SCHEDULE
+    const matches = [];
+    let lastCode = null;
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const tokens = tc.items.map(i => i.str);
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const token = tokens[i];
+
+            const m = token.match(/\b(\d{3})\s*\.\.\./);
+
+            if (!m) continue;
+
+            const code = m[1];
+
+            // 🔥 filter: first digit must be 2, 3, or 4
+            if (!/^[234]/.test(code)) continue;
+
+            // only record when code changes
+            if (code === lastCode) continue;
+            lastCode = code;
+
+            const before5 = tokens[i - 5];
+            if (!before5) continue;
+            const waypointBefore = tokens[i - 7];
+
+            matches.push({
+                page: p,
+                code,
+                value: before5.slice(0, 5),
+                waypointBefore
+            });
+        }
+    }
+    
+    ///EDTO INFORMATION
+    let edtoPage = null;
+    let edtoGroups = [];
+
+    // STEP 1: FIND PAGE FIRST (NO RESET INSIDE LOOP)
+    for (let p = 1; p <= pdf.numPages; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items
+            .map(i => i.str)
+            .join(" ")
+            .toUpperCase();
+
+        if (text.includes("EDTO INFORMATION")) {
+            edtoPage = p;
+            break;
+        }
+    }
+
+    // STEP 2: HARD GUARD (ONLY ONCE)
+    if (!edtoPage) {
+        window.edtoGroups = [];
+    } else {
+
+        function isEDTOTime(t) {
+            const cleaned = (t || "").replace(/\s+/g, "");
+            return /^\d{1,2}\.\d{2}$/.test(cleaned);
+        }
+
+        function isAirport(t) {
+            return /^[A-Z]{4}(\s*\d+)?$/.test(t);
+        }
+
+        function cleanAirport(t) {
+            return (t.match(/^[A-Z]{4}/) || [null])[0];
+        }
+
+        const startPage = edtoPage;
+        const endPage = Math.min(edtoPage + 1, pdf.numPages);
+
+        edtoGroups = []; // reset ONCE here only
+
+        for (let p = startPage; p <= endPage; p++) {
+
+            const page = await pdf.getPage(p);
+            const tc = await page.getTextContent();
+            const tokens = tc.items.map(i => (i.str || "").trim());
+
+            let lastTime = null;
+
+            for (let i = 0; i < tokens.length; i++) {
+
+                const t = tokens[i];
+
+                if (isEDTOTime(t)) {
+                    lastTime = t.replace(/\s+/g, "");
+                }
+
+                if (t.includes("ENTRY")) {
+
+                    let airport1 = null;
+                    let airport2 = null;
+                    let airport3 = null;
+                    let airport4 = null;
+
+                    let start = lastTime;
+                    let end = null;
+
+                    for (let j = i - 1; j >= 0; j--) {
+                        if (isAirport(tokens[j])) {
+                            airport1 = cleanAirport(tokens[j]);
+                            break;
+                        }
+                    }
+
+                    let foundAfterEntry = [];
+
+                    for (let k = i + 1; k < tokens.length; k++) {
+
+                        const tk = tokens[k];
+
+                        if (tk.includes("EXIT")) {
+
+                            let exitEnd = null;
+
+                            for (let j = k - 1; j >= 0; j--) {
+                                if (isEDTOTime(tokens[j])) {
+                                    exitEnd = tokens[j].replace(/\s+/g, "");
+                                    break;
+                                }
+                            }
+
+                            end = exitEnd;
+
+                            for (let j = k - 1; j >= 0; j--) {
+                                if (isAirport(tokens[j])) {
+                                    airport4 = cleanAirport(tokens[j]);
+                                    break;
+                                }
+                            }
+
+                            break;
+                        }
+
+                        if (isAirport(tk)) {
+                            foundAfterEntry.push(cleanAirport(tk));
+                        }
+                    }
+
+                    airport2 = foundAfterEntry[0] || null;
+                    airport3 = foundAfterEntry[1] || null;
+
+                    edtoGroups.push({
+                        airport1,
+                        airport2,
+                        airport3,
+                        airport4,
+                        start,
+                        end
+                    });
+                }
+            }
+        }
+
+        window.edtoGroups = edtoGroups;
+    }
+
+    ///FIRs
+    const resultsFIR = [];
+
+    function isFIR(t) {
+        return /^-[A-Z]{4}$/.test(t);
+    }
+
+    function isWP5(t) {
+        return /^[A-Z]{5}$/.test(t);
+    }
+
+    function isWP3(t) {
+        return /^[A-Z]{3}$/.test(t);
+    }
+
+    function isFIRTime(t) {
+        return /^\d{3}\.\d$/.test(t);
+    }
+
+    function cleanTime(t) {
+        return (t || "").slice(0, 5);
+    }
+
+    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const tokens = tc.items.map(i => (i.str || "").trim());
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const t = tokens[i];
+
+            // =========================
+            // FIR extraction
+            // =========================
+            if (isFIR(t)) {
+
+                const timeToken = tokens[i + 2] || "";
+                const time = cleanTime(timeToken);
+
+                resultsFIR.push({
+                    type: "FIR",
+                    fir: t.replace("-", ""),
+                    time,
+                    waypoint: null
+                });
+            }
+
+            // =========================
+            // 5-letter waypoint
+            // =========================
+            if (isWP5(t)) {
+
+                const timeToken = tokens[i + 2] || "";
+                const time = cleanTime(timeToken);
+
+                resultsFIR.push({
+                    type: "WP5",
+                    waypoint: t,
+                    time
+                });
+            }
+
+            // =========================
+            // 3-letter waypoint
+            // =========================
+            if (isWP3(t)) {
+
+                const check = tokens[i + 2] || "";
+
+                if (!isFIRTime(check)) continue;
+
+                const timeToken = tokens[i + 4] || "";
+                const time = cleanTime(timeToken);
+
+                resultsFIR.push({
+                    type: "WP3",
+                    waypoint: t,
+                    time
+                });
+            }
+        }
+    }
+
+    
+    const firMap = new Map();
+    const waypointMap = new Map();
+
+    // =========================
+    // STEP 1: BUILD MAPS
+    // =========================
+    for (const r of resultsFIR) {
+
+        if (r.type === "FIR") {
+            firMap.set(r.time, r.fir);
+        }
+
+        if (r.type === "WP5" || r.type === "WP3") {
+            if (!waypointMap.has(r.time)) {
+                waypointMap.set(r.time, []);
+            }
+            waypointMap.get(r.time).push(r.waypoint);
+        }
+    }
+
+    // ordered FIR timeline
+    const firEntries = [...firMap.entries()];
+
+    const annotations = [];
+
+    // =========================
+    // STEP 2: RESOLVE FIR → WAYPOINT
+    // =========================
+    for (let i = 0; i < firEntries.length; i++) {
+
+        const [time, fir] = firEntries[i];
+
+        let waypoint = null;
+        let fallbackWaypointTime = null;
+
+        // =========================
+        // 1. EXACT MATCH
+        // =========================
+        const exact = waypointMap.get(time);
+        if (exact && exact.length > 0) {
+
+            waypoint = exact[0];
+
+        } else {
+
+            // =========================
+            // 2. FALLBACK: closest previous waypoint
+            // =========================
+            let bestTime = null;
+            let bestWaypoint = null;
+
+            for (const [wpTime, wps] of waypointMap.entries()) {
+
+                if (wpTime < time && wps && wps.length > 0) {
+
+                    if (bestTime === null || wpTime > bestTime) {
+                        bestTime = wpTime;
+                        bestWaypoint = wps[wps.length - 1];
+                    }
+                }
+            }
+
+            if (bestWaypoint) {
+                waypoint = bestWaypoint;
+                fallbackWaypointTime = bestTime;
+            }
+        }
+
+        // =========================
+        // STEP 3: OUTPUT
+        // =========================
+        const info = getFIRInfo(fir);
+
+        if (waypoint) {
+
+            annotations.push({
+                time,
+                fir,
+                firName: info.name || "",
+                country: info.country || "",
+                waypoint,
+                fallbackTime: fallbackWaypointTime || null
+            });
+
+        } else {
+
+            annotations.push({
+                time,
+                fir,
+                firName: info.name || "",
+                country: info.country || "",
+                waypoint: null,
+                fallbackTime: null
+            });
+        }
+    }
+
+    /* =========================================================
+    AIRPORT WX LIST EXTRACTION
+    ========================================================= */
+
+    let wxStartPage = null;
+    let wxEndPage = null;
+
+    /* -----------------------------
+    FIND START / END PAGES
+    ------------------------------ */
+    for (let p = 1; p <= pdf.numPages; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const text = tc.items.map(i => i.str).join(" ");
+
+        if (text.includes("Airport WX List") && wxStartPage === null) {
+            wxStartPage = p;
+        }
+
+        if (text.includes("AIRPORTLIST ENDED")) {
+            wxEndPage = p;
+            break;
+        }
+    }
+
+    /* -----------------------------
+    STORAGE
+    ------------------------------ */
+    let destinationWX = "";
+    let departureWX = "";
+
+    /* -----------------------------
+    WEATHER BREAK FORMATTER
+    ------------------------------ */
+    function addWeatherBreaks(str) {
+
+        return str
+            .replace(/\s+(SA)\b/g, "\n$1")
+            .replace(/\s+(FT)\b/g, "\n$1")
+            .replace(/\s+(TEMPO)\b/g, "\n$1")
+            .replace(/\s+(INTER)\b/g, "\n$1")
+            .replace(/\s+(PROB\d{0,2})\b/g, "\n$1")
+            .replace(/\s+(FM\d{4,6})\b/g, "\n$1")
+            .replace(/\s+(BECMG)\b/g, "\n$1");
+    }
+
+    /* =========================================================
+    SCAN WX BLOCK
+    ========================================================= */
+    for (let p = wxStartPage; p <= wxEndPage; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+        const tokens = tc.items.map(i => i.str);
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const t = tokens[i];
+
+            /* =========================
+            DESTINATION WX
+            ========================= */
+            if (t.includes("DESTINATION AIRPORT:")) {
+
+              let buf = "";
+              let started = false;
+              let equalsCount = 0;
+
+              for (let j = i; j < tokens.length; j++) {
+
+                  const t2 = tokens[j];
+
+                  // start ONLY at SA
+                  if (!started) {
+                      if (t2 === "SA" || t2.includes("SA")) {
+                          started = true;
+                      } else {
+                          continue;
+                      }
+                  }
+
+                  buf += " " + t2;
+
+                  // count "=" occurrences
+                  if (t2.includes("=")) {
+                      equalsCount++;
+                  }
+
+                  // stop after 2nd "="
+                  if (equalsCount === 2) {
+                      break;
+                  }
+              }
+
+              destinationWX = buf.trim();
+          }
+
+            /* =========================
+            DEPARTURE WX
+            ========================= */
+            if (t.includes("DEPARTURE AIRPORT:")) {
+
+                let buf = "";
+                let started = false;
+
+                for (let j = i; j < tokens.length; j++) {
+
+                    const t2 = tokens[j];
+
+                    // STOP BEFORE including "Space Weather Advisory:"
+                    if (t2.includes("Space Weather Advisory:")) {
+                        break;
+                    }
+
+                    // WAIT FOR SA BEFORE STARTING CAPTURE
+                    if (!started) {
+                        if (t2 === "SA") {
+                            started = true;
+                            buf += " " + t2;
+                        }
+                        continue;
+                    }
+
+                    // once started, keep collecting
+                    buf += " " + t2;
+                }
+
+                departureWX = buf.trim();
+            }
+        }
+    }
+
+    /* =========================================================
+    FORMAT INTO WEATHER LINES
+    ========================================================= */
+    function formatWX(raw) {
+
+        if (!raw) return [];
+
+        const formatted = addWeatherBreaks(raw);
+        const groups = formatted.split("\n");
+
+        const weatherLines = [];
+
+        for (const g of groups) {
+
+            const trimmed = g.trim();
+            if (!trimmed) continue;
+
+            const wrapped = trimmed.match(/.{1,90}/g) || [trimmed];
+
+            for (const w of wrapped) {
+                weatherLines.push(w);
+            }
+        }
+
+        return weatherLines;
+    }
+
+    const destLines = formatWX(destinationWX);
+    const depLines = formatWX(departureWX);
+
+    
+
+    ///FORECAST WINDS
+    /// FORECAST WIND EXTRACTION + ARROWS
+    let forecastStartPage = null;
+
+    let clbWinds = [];
+    let desWinds = [];
+
+    // 1. FIND START PAGE
+    for (let p = 1; p <= pdf.numPages; p++) {
+
+        const page = await pdf.getPage(p);
+        const tc = await page.getTextContent();
+
+        const text = tc.items.map(i => i.str).join(" ").toUpperCase();
+
+        if (text.includes("FORECAST WIND -")) {
+            forecastStartPage = p;
+            break;
+        }
+    }
+
+    if (forecastStartPage) {
+
+        const endPage = Math.min(forecastStartPage + 2, pdf.numPages);
+
+        for (let p = forecastStartPage; p <= endPage; p++) {
+
+            const page = await pdf.getPage(p);
+            const tc = await page.getTextContent();
+            const tokens = tc.items.map(i => (i.str || "").trim());
+
+            for (let i = 0; i < tokens.length; i++) {
+
+                const t = tokens[i];
+
+                // =========================
+                // CLB WINDS
+                // =========================
+                if (t === "CLB" && tokens[i + 2]) {
+
+                    const raw = tokens[i + 2];
+
+                    const matches = raw.match(/\d{5}/g) || [];
+
+                    clbWinds = matches.slice(0, 4).map(w => ({
+                        dir: w.slice(0, 3),
+                        spd: w.slice(3)
+                    }));
+                }
+
+                // =========================
+                // DES WINDS
+                // =========================
+                if (t === "DES" && tokens[i + 2]) {
+
+                    const raw = tokens[i + 2];
+
+                    const matches = raw.match(/\d{5}/g) || [];
+
+                    desWinds = matches.slice(0, 4).map(w => ({
+                        dir: w.slice(0, 3),
+                        spd: w.slice(3)
+                    }));
+                }
+            }
+        }
+    }
+
+    function drawWindArrow(octx, x, y, dirDeg, speed) {
+
+        const angle = (parseInt(dirDeg, 10) * Math.PI) / 180;
+
+        const length = 30;
+
+        const x2 = x + Math.sin(angle) * length;
+        const y2 = y - Math.cos(angle) * length;
+
+        // line
+        octx.strokeStyle = "blue";
+        octx.lineWidth = 1;
+
+        octx.beginPath();
+        octx.moveTo(x, y);
+        octx.lineTo(x2, y2);
+        octx.stroke();
+
+        // arrow head
+        const head = 8;
+        const left = angle - Math.PI / 6;
+        const right = angle + Math.PI / 6;
+
+        octx.beginPath();
+        octx.moveTo(x2, y2);
+        octx.lineTo(
+            x2 - Math.sin(left) * head,
+            y2 + Math.cos(left) * head
+        );
+        octx.lineTo(
+            x2 - Math.sin(right) * head,
+            y2 + Math.cos(right) * head
+        );
+        octx.closePath();
+        octx.fillStyle = "blue";
+        octx.fill();
+
+        // label under arrow
+        octx.fillStyle = "blue";
+        octx.font = "10px Helvetica";
+        octx.fillText(`${dirDeg}°/${speed}`, x - 10, y + 18);
+    }
+
+
+    
+/// FIND LEGS PAGES
+let sidPage = null;
+let starPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (sidPage === null && text.includes("SID TOTAL DIST:")) {
+        sidPage = p;
+    }
+
+    if (starPage === null && text.includes("STAR TOTAL DIST:")) {
+        starPage = p;
+    }
+
+    if (sidPage && starPage) break;
+}
+
+///FIND EDTO INFORMATION PAGES
+let edtoStartPage = null;
+let edtoEndPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        edtoStartPage === null &&
+        text.includes("EDTO INFORMATION:")
+    ) {
+        edtoStartPage = p;
+    }
+
+    if (
+        edtoEndPage === null &&
+        text.includes("EDTO ENROUTE ALTN AIRPORTS:")
+    ) {
+        edtoEndPage = p;
+    }
+
+    if (edtoStartPage && edtoEndPage) break;
+}
+
+///FIND WIND FORECAST PAGES
+const forecastWindPages = new Set();
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (text.includes("FORECAST WIND -")) {
+        forecastWindPages.add(p);
+    }
+}
+
+///ATC Flight Plan
+let atcFlightPlanPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    for (const item of tc.items) {
+
+        const token = (item.str || "").trim();
+
+        if (token === "ATC Flight Plan") {
+            atcFlightPlanPage = p;
+            break;
+        }
+    }
+
+    if (atcFlightPlanPage !== null) break;
+}
+
+///AIRPORT WEATHER PAGES
+let airportWxStartPage = null;
+let airportWxEndPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        airportWxStartPage === null &&
+        text.includes("AIRPORT WX LIST")
+    ) {
+        airportWxStartPage = p;
+    }
+
+    if (
+        airportWxEndPage === null &&
+        text.includes("AIRPORTLIST ENDED")
+    ) {
+        airportWxEndPage = p;
+    }
+
+    if (
+        airportWxStartPage !== null &&
+        airportWxEndPage !== null
+    ) {
+        break;
+    }
+}
+
+///NOTAMS for DEP/ARR
+///NOTAM PAGES
+let notamStartPage = null;
+let notamEndPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        notamStartPage === null &&
+        text.includes("NOTAM") &&
+        text.includes("DEPARTURE AIRPORT")
+    ) {
+        notamStartPage = p;
+    }
+
+    if (
+        notamEndPage === null &&
+        text.includes("DESTINATION ALTERNATE(S)")
+    ) {
+        notamEndPage = p;
+    }
+
+    if (
+        notamStartPage !== null &&
+        notamEndPage !== null
+    ) {
+        break;
+    }
+}
+
+///INTAM / CREW BULLETIN PAGES
+let crewBulletinStartPage = null;
+
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+
+    const text = tc.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (
+        text.includes("INTAM") &&
+        text.includes("CREW BULLETIN")
+    ) {
+        crewBulletinStartPage = p;
+        break;
+    }
+}
+
+const bulletinAnnotations = [];
+
+for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
+    const page = await pdf.getPage(p);
+    const textContent = await page.getTextContent();
+    const items = textContent.items;
+
+    for (let i = 1; i < items.length - 1; i++) {
+
+        const prev = items[i - 1].str;
+        const current = items[i].str;
+        const next = items[i + 1].str;
+
+        const prevHasEquals = prev.includes("=");
+        const isOneDot = current.includes("1.");
+
+        if (prevHasEquals && isOneDot) {
+            const cleanCurrent = current.replace("1.", "").trim();
+            bulletinAnnotations.push(`${cleanCurrent} - ${next.trim()}`);
+        }
+    }
+}
+
+///WX CHARTS Page
+/* -----------------------------
+   WEATHER CHARTS PAGE
+----------------------------- */
+for (let p = 1; p <= pdf.numPages; p++) {
+
+    const page = await pdf.getPage(p);
+    const textContent = await page.getTextContent();
+
+    const text = textContent.items
+        .map(i => i.str)
+        .join(" ")
+        .toUpperCase();
+
+    if (text.includes("SECURITY STATUS")) {
+
+        weatherChartsPage = Math.min(p + 1, pdf.numPages);
+        break;
+    }
+}
+
+
+
+
+
+
+
+
+
+const pagesToRender = [1, 2];
+
+if (
+    sidPage !== null &&
+    starPage !== null &&
+    starPage >= sidPage
+) {
+    for (let p = sidPage; p <= starPage; p++) {
+        pagesToRender.push(p);
+    }
+}
+
+if (
+    edtoStartPage !== null &&
+    edtoEndPage !== null &&
+    edtoEndPage >= edtoStartPage
+) {
+    for (let p = edtoStartPage; p <= edtoEndPage; p++) {
+
+        if (!pagesToRender.includes(p)) {
+            pagesToRender.push(p);
+        }
+    }
+}
+
+for (const p of forecastWindPages) {
+
+    if (!pagesToRender.includes(p)) {
+        pagesToRender.push(p);
+    }
+}
+
+if (
+    atcFlightPlanPage !== null &&
+    !pagesToRender.includes(atcFlightPlanPage)
+) {
+    pagesToRender.push(atcFlightPlanPage);
+}
+
+if (
+    airportWxStartPage !== null &&
+    airportWxEndPage !== null &&
+    airportWxEndPage >= airportWxStartPage
+) {
+    for (
+        let p = airportWxStartPage;
+        p <= airportWxEndPage;
+        p++
+    ) {
+        pagesToRender.push(p);
+    }
+}
+
+if (
+    notamStartPage !== null &&
+    notamEndPage !== null &&
+    notamEndPage >= notamStartPage
+) {
+    for (
+        let p = notamStartPage;
+        p <= notamEndPage;
+        p++
+    ) {
+        if (!pagesToRender.includes(p)) {
+            pagesToRender.push(p);
+        }
+    }
+}
+
+if (crewBulletinStartPage !== null) {
+
+    for (
+        let p = crewBulletinStartPage;
+        p <= pdf.numPages;
+        p++
+    ) {
+        if (!pagesToRender.includes(p)) {
+            pagesToRender.push(p);
+        }
+    }
+}
+
+/// NOTAM EXTRA TIME THING (FINAL CLEAN VERSION)
+
+const firstPage = await pdf.getPage(1);
+const firstText = await firstPage.getTextContent();
+const page1Text = firstText.items.map(i => i.str).join(" ");
+
+// 1. Extract flight date EARLY (critical fix)
+const dateMatch = page1Text.match(/\d{2}[A-Z]{3}\d{2}/);
+let notamDate = dateMatch ? dateMatch[0] : null;
+
+// 2. Extract scheduled times
+const depMatch = page1Text.match(/SCHED\s+DEP\s+(\d{4})/i);
+const arrMatch = page1Text.match(/SCHED\s+ARR\s+(\d{4})/i);
+
+let notamDepTime = depMatch ? depMatch[1] : null;
+let notamArrTime = arrMatch ? arrMatch[1] : null;
+
+// 3. Safety check
+if (!notamDate || !notamDepTime || !notamArrTime) {
+    console.error("Missing NOTAM base data:", {
+        notamDate,
+        notamDepTime,
+        notamArrTime
+    });
+}
+
+// 4. Build usable Date objects
+const depDateTime = makeFlightDate(notamDate, notamDepTime);
+const arrDateTime = makeFlightDate(notamDate, notamArrTime);
+
+// 5. Handle overnight rollover
+if (arrDateTime < depDateTime) {
+    arrDateTime.setUTCDate(arrDateTime.getUTCDate() + 1);
+}
+
+console.log("NOTAM BASE:", {
+    notamDate,
+    notamDepTime,
+    notamArrTime,
+    depDateTime,
+    arrDateTime
+});
+
+
+/// NOTAM ANALYSIS FEATURE
+
+let airportType = null;
+const ROW_TOLERANCE = 2; // pixels
+
+
+
+if (
+    notamStartPage !== null &&
+    notamEndPage !== null
+) {
+
+    extractedNotams = [];
+
+    let currentNotam = null;
+
+    function finishCurrentNotam() {
+        if (!currentNotam) return;
+
+        for (const row of currentNotam.rows) {
+            row.items.sort((a, b) => a.tx - b.tx);
+            row.text = row.items.map(i => i.text).join(" ");
+        }
+
+        currentNotam.rows.sort((a, b) => b.y - a.y);
+
+        extractedNotams.push(currentNotam);
+    }
+
+    for (let p = notamStartPage; p <= notamEndPage; p++) {
+
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale });
+        const textContent = await page.getTextContent();
+
+        const items = textContent.items;
+
+        for (let i = 0; i < items.length; i++) {
+
+            const item = items[i];
+            const token = (item.str || "").trim();
+
+            let next = "";
+
+            for (let j = i + 1; j < items.length; j++) {
+                next = (items[j].str || "").trim();
+                if (next !== "") break;
+            }
+
+            if (token === "DEPARTURE AIRPORT") {
+                airportType = "departure";
+                continue;
+            }
+
+            if (token === "DESTINATION AIRPORT") {
+                airportType = "destination";
+                continue;
+            }
+
+            const isHeader =
+                /^[A-Z0-9]+\/\d+$/.test(token) &&
+                next.startsWith("VALID:");
+
+            if (isHeader) {
+
+                finishCurrentNotam();
+
+                const t = item.transform;
+
+                currentNotam = {
+                    id: token,
+                    airportType,
+                    valid: next,
+                    page: p,
+                    text: token + " " + next,
+                    tx: t[4] * scale,
+                    ty: viewport.height - (t[5] * scale),
+                    width: item.width * scale,
+                    rows: []
+                };
+
+                i++; // Skip VALID line
+                continue;
+            }
+
+            if (currentNotam) {
+
+                currentNotam.text += " " + token;
+
+                const tx = item.transform[4] * scale;
+                const ty = viewport.height - (item.transform[5] * scale);
+
+                const tokenData = {
+                    text: token,
+                    tx,
+                    ty,
+                    width: item.width * scale,
+                    page: p
+                };
+
+                let row = currentNotam.rows.find(
+                    r => Math.abs(r.y - ty) <= ROW_TOLERANCE
+                );
+
+                if (!row) {
+                    row = {
+                        y: ty,
+                        items: []
+                    };
+                    currentNotam.rows.push(row);
+                }
+
+                row.items.push(tokenData);
+            }
+        }
+    }
+
+    finishCurrentNotam();
+}
+
+const GROUP_A = [
+    "RWY",
+    "RUNWAY",
+    "TWY",
+    "TAXIWAY",
+    "ILS",
+    "GP",
+    "LOC",
+    "MINIMA",
+    "TXL"
+];
+
+const GROUP_B = [
+    "CLOSED",
+    "CLSD",
+    "CHANGED",
+    "INCREASED",
+    "REDUCED",
+    "NOT ALLOWED",
+    "NOT AVBL",
+    "U/S",
+    "UNSERVICEABLE",
+    "UNUSABLE"
+];
+
+const NOTAM_BLACKLIST = {
+    // WSSS SINGAPORE
+    "SX65/25": "Known non-critical NOTAM",
+    "SX163/25": "Company policy - do not highlight",
+    "SX120/25": "Long winded NOTAM on permanently unused RWY",
+    "SX56/26": "Irrelevant taxiways",
+    "SX174/24": "Taxiways associated with RWY3"
+
+    // Add more as needed...
+};
+
+for (const notam of extractedNotams) {
+
+    const valid = isNotamValidForFlight(
+        notam.valid,
+        notam.airportType === "departure"
+            ? depDateTime
+            : arrDateTime
+    );
+
+    const hasA = containsKeyword(notam.text, GROUP_A);
+    const hasB = containsKeyword(notam.text, GROUP_B);
+
+    console.log(notam.id, {
+        airport: notam.airportType,
+        validity: notam.valid,
+        valid,
+        hasGroupA: hasA,
+        hasGroupB: hasB
+    });
+}
+
+
+
+function containsKeyword(text, keywords) {
+
+    const upper = text.toUpperCase();
+
+    return keywords.some(keyword => {
+
+        const escaped = keyword
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .replace(/\s+/g, "\\s+");
+
+        const regex = new RegExp(`\\b${escaped}\\b`, "i");
+
+        return regex.test(upper);
+
+    });
+
+}
+
+function shouldHighlightNotam(notam) {
+
+    if (NOTAM_BLACKLIST[notam.id]) {
+        return false;
+    }
+
+    // ---------- Airport ----------
+    const flightTime =
+        notam.airportType === "departure"
+            ? depDateTime
+            : arrDateTime;
+
+    // validity check comes next
+    if (!isNotamValidForFlight(notam.valid, flightTime)) {
+        return false;
+    }
+
+    // ---------- Keywords ----------
+    const hasGroupA = containsKeyword(notam.text, GROUP_A);
+    const hasGroupB = containsKeyword(notam.text, GROUP_B);
+
+    return hasGroupA && hasGroupB;
+}
+
+function parseNotamValidity(validString) {
+
+    const match = validString.match(
+        /VALID:\s+(\d{2}-[A-Z]{3}-\d{2})\s+(\d{4})\s*-\s*(PERM|UFN|\d{2}-[A-Z]{3}-\d{2}\s+\d{4})/i
+    );
+
+    if (!match) return null;
+
+    const [, startDate, startTime, endPart] = match;
+
+    const start = makeFlightDate(startDate.toUpperCase(), startTime);
+
+    let end;
+
+    if (
+        endPart.toUpperCase() === "PERM" ||
+        endPart.toUpperCase() === "UFN"
+    ) {
+
+        end = new Date("2099-12-31T23:59:00Z");
+
+    } else {
+
+        const [endDate, endTime] = endPart.split(/\s+/);
+
+        end = makeFlightDate(endDate.toUpperCase(), endTime);
+
+    }
+
+    return { start, end };
+}
+
+function isNotamValidForFlight(validString, flightTime) {
+
+    const validity = parseNotamValidity(validString);
+
+    if (!validity) return false;
+
+    const windowStart = new Date(flightTime);
+    const windowEnd = new Date(flightTime);
+
+    windowStart.setUTCHours(windowStart.getUTCHours() - 1);
+    windowEnd.setUTCHours(windowEnd.getUTCHours() + 1);
+
+    return (
+        validity.start <= windowEnd &&
+        validity.end >= windowStart
+    );
+}
+
+///WEATHER ANALYSIS
+function resolveWeather(periods, time) {
+
+    console.log("🌤️ RESOLVE WEATHER RUNNING");
+
+    const sa = periods.find(p => p.type === "SA") || null;
+
+    const ft = periods.find(p =>
+        p.type === "FT" &&
+        p.validFrom &&
+        p.validTo &&
+        time >= p.validFrom &&
+        time <= p.validTo
+    ) || null;
+
+    let base = null;
+
+    if (sa && sa.visibility) {
+        base = sa;
+    } else {
+        base = ft || sa || periods[0] || null;
+    }
+
+    const overlays = [];
+
+    for (const p of periods) {
+        if (p === base) continue;
+
+        if (p.validFrom && p.validTo) {
+            if (time >= p.validFrom && time <= p.validTo) {
+                overlays.push(p);
+            }
+        }
+    }
+
+    const baseCloud = getCloudBase(base);
+
+    return {
+        base,
+        overlays,
+        all: [base, ...overlays],
+        cloudBase: baseCloud
+    };
+}
+
+function resolveDestinationWeather(periods, time) {
+
+    let base = null;
+    const overlays = [];
+
+    // STEP 1: ONLY FT is base candidate
+    const ft = periods.find(p =>
+        p.type === "FT" &&
+        p.validFrom &&
+        p.validTo &&
+        time >= p.validFrom &&
+        time <= p.validTo
+    ) || null;
+
+    base = ft || periods[0] || null;
+
+    if (!base)
+        return null;
+
+    // STEP 2: overlays
+    for (const p of periods) {
+
+        if (p === base)
+            continue;
+
+        if (p.validFrom && p.validTo) {
+            if (time >= p.validFrom && time <= p.validTo) {
+                overlays.push(p);
+            }
+        }
+    }
+
+    const baseCloud = getCloudBase(base);
+
+    return {
+        base,
+        overlays,
+        all: [base, ...overlays],
+        cloudBase: baseCloud
+    };
+}
+
+const depAlerts = [];
+const destAlerts = [];
+
+function parseWeather(raw, baseDate) {
+
+    const GROUP_STARTS = [
+        "SA",
+        "FT",
+        "TEMPO",
+        "INTER",
+        "BECMG",
+        "FM",
+        "PROB30",
+        "PROB40"
+    ];
+
+    const WEATHER_CODES = new Set([
+        "RA","DZ","SHRA","SHDZ","+RA","+SHRA","-RA","-SHRA",
+        "TS","TSRA","+TSRA","-TSRA","VCTS",
+        "SN","SHSN","SG","PL","GR","GS","FZRA","FZDZ",
+        "FG","BR","HZ","FU","DU","SA","VA",
+        "SQ","FC","+FC","PO","DS","SS","NSW"
+    ]);
+
+    const tokens = raw
+        .replace(/=/g, " = ")
+        .trim()
+        .split(/\s+/);
+
+    const periods = [];
+
+    let current = null;
+
+    function finishCurrent() {
+        if (current) {
+            periods.push(current);
+        }
+    }
+
+    for (const token of tokens) {
+
+        //----------------------------------
+        // New forecast group
+        //----------------------------------
+        if (GROUP_STARTS.includes(token)) {
+
+            finishCurrent();
+
+            current = {
+                type: token,
+                issue: null,
+                validFrom: null,
+                validTo: null,
+                validFromText: null,
+                validToText: null,
+                wind: null,
+                visibility: null,
+                pressure: null,
+                temperature: null,
+                clouds: [],
+                weather: [],
+                other: [],
+                raw: token
+            };
+
+            continue;
+        }
+
+        if (!current)
+            continue;
+
+        current.raw += " " + token;
+
+        if (token === "=")
+            continue;
+
+        //----------------------------------
+        // Issue time
+        //----------------------------------
+        if (
+            current.issue === null &&
+            /^\d{6}$/.test(token)
+        ) {
+            current.issueText = token;
+            current.issue = makeWeatherDate(baseDate, token);
+            continue;
+        }
+
+        //----------------------------------
+        // Validity
+        //----------------------------------
+        if (/^\d{4}\/\d{4}$/.test(token)) {
+
+            const [from, to] = token.split("/");
+
+            current.validFromText = from;
+            current.validToText = to;
+
+            current.validFrom = makeWeatherDate(baseDate, from);
+            current.validTo = makeWeatherDate(baseDate, to);
+
+            if (current.validTo < current.validFrom) {
+                current.validTo.setUTCMonth(
+                    current.validTo.getUTCMonth() + 1
+                );
+            }
+            continue;
+        }
+
+        //----------------------------------
+        // Wind
+        //----------------------------------
+        if (/KT$|MPS$/.test(token)) {
+            current.wind = token;
+            continue;
+        }
+
+        //----------------------------------
+        // Visibility (FIXED)
+        //----------------------------------
+        if (token === "CAVOK") {
+            current.visibility = "CAVOK";
+            continue;
+        }
+
+        if (/^\d{4}$/.test(token)) {
+            current.visibility = token;
+            continue;
+        }
+
+        const visMatch = token.match(/\b\d{4}\b/);
+        if (visMatch && !current.visibility) {
+            current.visibility = visMatch[0];
+        }
+
+        //----------------------------------
+        // Pressure
+        //----------------------------------
+        if (/^Q\d{4}$/.test(token)) {
+            current.pressure = token;
+            continue;
+        }
+
+        //----------------------------------
+        // Temperature / Dewpoint
+        //----------------------------------
+        if (/^M?\d{2}\/M?\d{2}$/.test(token)) {
+            current.temperature = token;
+            continue;
+        }
+
+        //----------------------------------
+        // Clouds
+        //----------------------------------
+        if (/^(FEW|SCT|BKN|OVC|VV)/.test(token)) {
+            current.clouds.push(token);
+            continue;
+        }
+
+        //----------------------------------
+        // Weather phenomena
+        //----------------------------------
+        if (WEATHER_CODES.has(token)) {
+            current.weather.push(token);
+            continue;
+        }
+
+        current.other.push(token);
+    }
+
+    finishCurrent();
+
+    console.log("TOKENS:", tokens);
+    console.log("PARSED:", periods);
+
+    return periods;
+}
+
+const departureForecast = parseWeather(departureWX, depDateTime);
+const destinationForecast = parseWeather(destinationWX, arrDateTime);
+
+///WX Applicable Forecast
+function getApplicableForecast(periods, flightTime) {
+
+    let base = null;
+    const overlays = [];
+
+    for (const period of periods) {
+
+        if (period.type === "FT" || period.type === "SA") {
+
+            if (period.type === "SA") {
+                base = period;
+                continue;
+            }
+
+            if (
+                period.validFrom &&
+                period.validTo &&
+                flightTime >= period.validFrom &&
+                flightTime <= period.validTo
+            ) {
+                base = period;
+            }
+
+            continue;
+        }
+
+        if (
+            period.type === "TEMPO" ||
+            period.type === "INTER" ||
+            period.type === "PROB30" ||
+            period.type === "PROB40"
+        ) {
+
+            if (
+                period.validFrom &&
+                period.validTo &&
+                flightTime >= period.validFrom &&
+                flightTime <= period.validTo
+            ) {
+                overlays.push(period);
+            }
+
+            continue;
+        }
+    }
+
+    return { base, overlays };
+}
+
+///VIS ANALYSIS (FIXED CAVOK LOGIC)
+function analyseVisibility(applicable) {
+
+    const alerts = [];
+
+    const all = [
+        ...(applicable.base ? [applicable.base] : []),
+        ...(applicable.overlays || [])
+    ];
+
+    for (const period of all) {
+
+        if (!period.visibility)
+            continue;
+
+        const vis = period.visibility;
+
+        if (vis === "CAVOK") {
+            alerts.push({
+                type: "visibility",
+                severity: "info",
+                value: 10000,
+                source: period.type,
+                text: "CAVOK (≥10km visibility)"
+            });
+            continue;
+        }
+
+        const numVis = parseInt(vis, 10);
+
+        if (isNaN(numVis))
+            continue;
+
+        if (numVis === 9999) {
+            alerts.push({
+                type: "visibility",
+                severity: "info",
+                value: 9999,
+                source: period.type,
+                text: "Visibility ≥10 km"
+            });
+            continue;
+        }
+
+        let severity = "info";
+
+        if (numVis < 1500)
+            severity = "warning";
+        else if (numVis < 5000)
+            severity = "caution";
+
+        alerts.push({
+            type: "visibility",
+            severity,
+            value: numVis,
+            source: period.type,
+            text: `Visibility ${numVis} m`
+        });
+    }
+
+    return alerts;
+}
+
+
+
+///CLOUD BASE ANALYSIS
+function getCloudBase(period) {
+
+    if (!period.clouds || period.clouds.length === 0)
+        return null;
+
+    // No cloud / No significant cloud
+    if (
+        period.clouds.includes("NCD") ||
+        period.clouds.includes("NSC")
+    ) {
+        return null;
+    }
+
+    let lowest = null;
+
+    for (const c of period.clouds) {
+
+        // Extract cloud type and height
+        // e.g. BKN020, OVC005, VV002
+        const match = c.match(/^(FEW|SCT|BKN|OVC|VV)(\d{3})$/);
+
+        if (!match)
+            continue;
+
+        const type = match[1];
+        const height = parseInt(match[2], 10) * 100; // feet
+
+        // Vertical visibility always defines the ceiling
+        if (type === "VV") {
+            return {
+                base: height,
+                isVertical: true
+            };
+        }
+
+        // Ceiling is the lowest BKN or OVC layer
+        if (type === "BKN" || type === "OVC") {
+
+            if (lowest === null || height < lowest) {
+                lowest = height;
+            }
+        }
+    }
+
+    if (lowest === null)
+        return null;
+
+    return {
+        base: lowest,
+        isVertical: false
+    };
+}
+
+///RWY EXTRACTION
+///RUNWAY EXTRACTION
+async function extractRunways(pdf) {
+
+    const page = await pdf.getPage(1);
+    const textContent = await page.getTextContent();
+
+    const runways = [];
+
+    for (const item of textContent.items) {
+
+        const match = item.str.match(/[A-Z]{4}\/(\d{2}[LRC]?)/);
+
+        if (match) {
+            runways.push(match[1]);
+        }
+    }
+
+    return {
+        departure: runways[0] || null,
+        arrival: runways[1] || null
+    };
+}
+
+const runways = await extractRunways(pdf);
+
+const departureRunway = runways.departure;
+const arrivalRunway = runways.arrival;
+
+///RUNWAY HEADING
+function runwayHeading(runway) {
+
+    if (!runway)
+        return null;
+
+    const number = parseInt(runway, 10);
+
+    if (isNaN(number))
+        return null;
+
+    // Runway 36 = 360°
+    if (number === 36)
+        return 360;
+
+    return number * 10;
+}
+
+
+
+///WINDS
+function parseWind(windString, other = []) {
+
+    if (!windString)
+        return null;
+
+    const result = {
+        direction: null,
+        speed: 0,
+        gust: null,
+        variable: false,
+        variableRange: null
+    };
+
+    // VRB
+    if (windString.startsWith("VRB")) {
+        result.variable = true;
+
+        const m = windString.match(/^VRB(\d{2,3})(KT|MPS)$/);
+
+        if (m)
+            result.speed = parseInt(m[1], 10);
+    }
+    else {
+
+        const m = windString.match(/^(\d{3})(\d{2,3})(G(\d{2,3}))?(KT|MPS)$/);
+
+        if (m) {
+            result.direction = parseInt(m[1], 10);
+            result.speed = parseInt(m[2], 10);
+
+            if (m[4])
+                result.gust = parseInt(m[4], 10);
+        }
+    }
+
+    // Direction variation (240V310)
+    const vr = other.find(x => /^\d{3}V\d{3}$/.test(x));
+
+    if (vr) {
+
+        const [from, to] = vr.split("V");
+
+        result.variableRange = {
+            from: parseInt(from, 10),
+            to: parseInt(to, 10)
+        };
+    }
+
+    return result;
+}
+
+function analyseWind(period, runwayHeading) {
+    const alerts = [];
+
+    if (!period || !period.wind)
+        return alerts;
+
+    const wind = parseWind(period.wind, period.other);
+
+    if (!wind)
+        return alerts;
+
+    // -------------------
+    // Strong wind
+    // -------------------
+    if (wind.speed >= 25) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Strong wind (${wind.speed} kt)`
+        });
+    }
+
+    // -------------------
+    // Gusts
+    // -------------------
+    if (wind.gust !== null) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Wind gusts to ${wind.gust} kt`
+        });
+    }
+
+    // -------------------
+    // VRB
+    // -------------------
+    if (wind.variable) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Variable wind (possible tailwind or runway change)"
+        });
+    }
+
+    // -------------------
+    // Variable direction
+    // -------------------
+    if (wind.variableRange) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Wind direction variable ${wind.variableRange.from}°–${wind.variableRange.to}°`
+        });
+    }
+
+    // -------------------
+    // Crosswind
+    // -------------------
+    if (wind.direction !== null && wind.speed >= 10) {
+        let diff = Math.abs(wind.direction - runwayHeading);
+
+        if (diff > 180)
+            diff = 360 - diff;
+
+        if (diff > 60) {
+            alerts.push({
+                severity: "caution",
+                text: `Crosswind (${diff}° off runway)`
+            });
+        }
+    }
+
+    return alerts;
+}
+
+///TEMPERATURE ANALYSIS
+function analyseTemperature(period) {
+
+    const alerts = [];
+
+    if (!period || !period.temperature)
+        return alerts;
+
+    const tempText = period.temperature.split("/")[0];
+
+    // M02 -> -2
+    const temperature = tempText.startsWith("M")
+        ? -parseInt(tempText.slice(1), 10)
+        : parseInt(tempText, 10);
+
+    if (isNaN(temperature))
+        return alerts;
+
+    // -------------------
+    // Very hot
+    // -------------------
+    if (temperature > 40) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Very hot (${temperature}°C)`
+        });
+
+    }
+    // -------------------
+    // Hot
+    // -------------------
+    else if (temperature > 33) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Hot (${temperature}°C)`
+        });
+    }
+
+    // -------------------
+    // Very cold
+    // -------------------
+    if (temperature < -15) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Very cold (${temperature}°C)`
+        });
+
+    }
+    // -------------------
+    // Below freezing
+    // -------------------
+    else if (temperature < 0) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Below freezing (${temperature}°C)`
+        });
+
+    }
+    // -------------------
+    // Cold
+    // -------------------
+    else if (temperature < 10) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Cold (${temperature}°C) - potential icing`
+        });
+    }
+
+    return alerts;
+}
+
+///THUNDERSTORM ANALYSIS
+function analyseThunderstorms(period) {
+
+    const alerts = [];
+
+    if (!period)
+        return alerts;
+
+    // -------------------
+    // Thunderstorm weather
+    // -------------------
+    const wx = period.weather || [];
+
+    if (
+        wx.includes("TS") ||
+        wx.includes("TSRA") ||
+        wx.includes("+TSRA") ||
+        wx.includes("-TSRA") ||
+        wx.includes("VCTS")
+    ) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Thunderstorms"
+        });
+    }
+
+    // -------------------
+    // Convective clouds
+    // -------------------
+    const clouds = period.clouds || [];
+
+    const hasCB = clouds.some(c => c.includes("CB"));
+    const hasTCU = clouds.some(c => c.includes("TCU"));
+
+    if (hasCB) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Cumulonimbus (CB)"
+        });
+
+    } else if (hasTCU) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Towering Cumulus (TCU)"
+        });
+
+    }
+
+    return alerts;
+}
+
+
+///PRESSURE ANALYSIS
+function analysePressure(period, phase) {
+
+    const alerts = [];
+
+    if (!period || !period.pressure)
+        return alerts;
+
+    const qnh = parseInt(period.pressure.replace("Q", ""), 10);
+
+    if (isNaN(qnh))
+        return alerts;
+
+    // -------------------
+    // High pressure
+    // -------------------
+    if (qnh > 1025) {
+
+        alerts.push({
+            severity: "caution",
+            text: `High pressure (QNH ${qnh})`
+        });
+    }
+
+    // -------------------
+    // Low pressure
+    // -------------------
+    if (qnh < 1000) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Low pressure (QNH ${qnh})`
+        });
+    }
+
+    // -------------------
+    // Transition pressure change
+    // -------------------
+    const delta = qnh - 1013;
+
+    if (delta !== 0) {
+
+        const altitude = Math.abs(delta * 27);
+
+        if (phase === "departure") {
+
+            alerts.push({
+                severity: "info",
+                text: delta > 0
+                    ? `${altitude} ft gained changing to STD`
+                    : `${altitude} ft lost changing to STD`
+            });
+
+        } else {
+
+            alerts.push({
+                severity: "info",
+                text: delta > 0
+                    ? `${altitude} ft lost changing to QNH`
+                    : `${altitude} ft gained changing to QNH`
+            });
+
+        }
+    }
+
+    return alerts;
+}
+
+const destSA = destinationForecast.find(
+    p => p.type === "SA"
+);
+
+///WEATHER HAZARD ANALYSIS
+function analyseWeatherHazards(period) {
+
+    const alerts = [];
+
+    if (!period)
+        return alerts;
+
+    const wx = period.weather || [];
+
+    // -------------------
+    // Freezing precipitation
+    // -------------------
+    if (
+        wx.includes("FZRA") ||
+        wx.includes("FZDZ")
+    ) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Freezing precipitation"
+        });
+    }
+
+    // -------------------
+    // Fog
+    // -------------------
+    if (wx.includes("FG")) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Fog"
+        });
+    }
+
+    // -------------------
+    // Dust
+    // -------------------
+    if (wx.includes("DU")) {
+
+        alerts.push({
+            severity: "caution",
+            text: "Dust"
+        });
+    }
+
+    // -------------------
+    // Sand
+    // -------------------
+    if (wx.includes("SA")) {
+
+        alerts.push({
+            severity: "caution",
+            text: "Sand"
+        });
+    }
+
+    // -------------------
+    // Volcanic ash
+    // -------------------
+    if (wx.includes("VA")) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Volcanic ash"
+        });
+    }
+
+    return alerts;
+}
+
+const depApplicable = resolveWeather(departureForecast, depDateTime);
+const destApplicable = resolveDestinationWeather(destinationForecast, arrDateTime);
+
+const depVis = analyseVisibility(depApplicable);
+const destVis = analyseVisibility(destApplicable);
+
+const depCloud = getCloudBase(depApplicable.base);
+const destCloud = getCloudBase(destApplicable.base);
+
+const depWind = analyseWind(
+    depApplicable.base,
+    runwayHeading(departureRunway)
+);
+
+const destWind = analyseWind(
+    destApplicable.base,
+    runwayHeading(arrivalRunway)
+);
+
+const depTemp = analyseTemperature(depApplicable.base);
+const destTemp = analyseTemperature(destApplicable.base);
+
+const depPressure = analysePressure(
+    depApplicable.base,
+    "departure"
+);
+
+const destPressure = analysePressure(
+    destSA,
+    "arrival"
+);
+
+const depTS = analyseThunderstorms(depApplicable.base);
+const destTS = analyseThunderstorms(destApplicable.base);
+
+const depHazards = analyseWeatherHazards(depApplicable.base);
+const destHazards = analyseWeatherHazards(destApplicable.base);
+
+function buildWeatherLines(...groups) {
+
+    const lines = [];
+    const infoLines = [];
+
+    for (const group of groups) {
+
+        if (!group)
+            continue;
+
+        for (const alert of group) {
+
+            if (
+                alert.severity === "warning" ||
+                alert.severity === "caution"
+            ) {
+                lines.push(alert.text);
+            }
+
+            else if (
+                alert.severity === "info" &&
+                (
+                    alert.text.includes("changing to STD") ||
+                    alert.text.includes("changing to QNH")
+                )
+            ) {
+                infoLines.push(alert.text);
+            }
+        }
+    }
+
+    // No cautions/warnings -> GOOD WEATHER first
+    if (lines.length === 0) {
+        lines.push("GOOD WEATHER");
+    }
+
+    // Always append QNH transition information afterwards
+    lines.push(...infoLines);
+
+    return lines;
+}
+
+const depWxLines = buildWeatherLines(
+    depVis,
+    depWind,
+    depTemp,<!DOCTYPE html>
+<html>
+<head>
+<meta charset="UTF-8">
+<title>OFP Annotation Tool</title>
+
+<style>
+body {
+    margin: 0;
+    font-family: Arial;
+    background: #f5f7fa;
+}
+
+.header {
+    padding: 20px;
+    text-align: center;
+    background: white;
+    border-bottom: 1px solid #ddd;
+}
+
+.upload {
+    display: flex;
+    justify-content: center;
+    padding: 15px;
+    background: #f9f9f9;
+    border-bottom: 1px solid #ddd;
+}
+
+#viewer {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 30px;
+}
+
+.pageWrapper {
+    position: relative;
+    margin-bottom: 20px;
+    display: inline-block;
+    z-index: 0;
+}
+
+canvas.pdfCanvas {
+    border: 1px solid #ccc;
+    background: white;
+    position: relative;
+    z-index: 1;
+}
+
+canvas.overlayCanvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    pointer-events: none;
+    z-index:2;
+}
+</style>
+</head>
+
+<body>
+
+<div class="header">
     <h2>OFP Annotation Tool v1.3</h2>
 </div>
 
@@ -1562,6 +5567,54 @@ function makeFlightDate(dateStr, timeStr) {
     return new Date(Date.UTC(year, month, day, hour, minute));
 }
 
+function makeWeatherDate(baseDate, value) {
+
+    const day = parseInt(value.slice(0, 2));
+
+    let hour = 0;
+    let minute = 0;
+
+    if (value.length === 6) {
+        // DDHHMM
+        hour = parseInt(value.slice(2, 4));
+        minute = parseInt(value.slice(4, 6));
+    }
+    else if (value.length === 4) {
+        // DDHH
+        hour = parseInt(value.slice(2, 4));
+    }
+    else {
+        return null;
+    }
+
+    // Start with flight month/year
+    const d = new Date(Date.UTC(
+        baseDate.getUTCFullYear(),
+        baseDate.getUTCMonth(),
+        day,
+        hour,
+        minute,
+        0,
+        0
+    ));
+
+    // Difference from flight date
+    const diffDays =
+        (d - baseDate) / (1000 * 60 * 60 * 24);
+
+    // More than ~half a month ahead?
+    if (diffDays > 15) {
+        d.setUTCMonth(d.getUTCMonth() - 1);
+    }
+
+    // More than ~half a month behind?
+    if (diffDays < -15) {
+        d.setUTCMonth(d.getUTCMonth() + 1);
+    }
+
+    return d;
+}
+
 ///NOTAM KEYWORDS
 function matchesGroup(text, group) {
     return group.some(k => text.includes(k));
@@ -2229,6 +6282,8 @@ fileInput.addEventListener("change", async (e) => {
 
     const destLines = formatWX(destinationWX);
     const depLines = formatWX(departureWX);
+
+    
 
     ///FORECAST WINDS
     /// FORECAST WIND EXTRACTION + ARROWS
@@ -2983,6 +7038,990 @@ function isNotamValidForFlight(validString, flightTime) {
     );
 }
 
+///WEATHER ANALYSIS
+function resolveWeather(periods, time) {
+
+    console.log("🌤️ RESOLVE WEATHER RUNNING");
+
+    const sa = periods.find(p => p.type === "SA") || null;
+
+    const ft = periods.find(p =>
+        p.type === "FT" &&
+        p.validFrom &&
+        p.validTo &&
+        time >= p.validFrom &&
+        time <= p.validTo
+    ) || null;
+
+    let base = null;
+
+    if (sa && sa.visibility) {
+        base = sa;
+    } else {
+        base = ft || sa || periods[0] || null;
+    }
+
+    const overlays = [];
+
+    for (const p of periods) {
+        if (p === base) continue;
+
+        if (p.validFrom && p.validTo) {
+            if (time >= p.validFrom && time <= p.validTo) {
+                overlays.push(p);
+            }
+        }
+    }
+
+    const baseCloud = getCloudBase(base);
+
+    return {
+        base,
+        overlays,
+        all: [base, ...overlays],
+        cloudBase: baseCloud
+    };
+}
+
+function resolveDestinationWeather(periods, time) {
+
+    let base = null;
+    const overlays = [];
+
+    // STEP 1: ONLY FT is base candidate
+    const ft = periods.find(p =>
+        p.type === "FT" &&
+        p.validFrom &&
+        p.validTo &&
+        time >= p.validFrom &&
+        time <= p.validTo
+    ) || null;
+
+    base = ft || periods[0] || null;
+
+    if (!base)
+        return null;
+
+    // STEP 2: overlays
+    for (const p of periods) {
+
+        if (p === base)
+            continue;
+
+        if (p.validFrom && p.validTo) {
+            if (time >= p.validFrom && time <= p.validTo) {
+                overlays.push(p);
+            }
+        }
+    }
+
+    const baseCloud = getCloudBase(base);
+
+    return {
+        base,
+        overlays,
+        all: [base, ...overlays],
+        cloudBase: baseCloud
+    };
+}
+
+const depAlerts = [];
+const destAlerts = [];
+
+function parseWeather(raw, baseDate) {
+
+    const GROUP_STARTS = [
+        "SA",
+        "FT",
+        "TEMPO",
+        "INTER",
+        "BECMG",
+        "FM",
+        "PROB30",
+        "PROB40"
+    ];
+
+    const WEATHER_CODES = new Set([
+        "RA","DZ","SHRA","SHDZ","+RA","+SHRA","-RA","-SHRA",
+        "TS","TSRA","+TSRA","-TSRA","VCTS",
+        "SN","SHSN","SG","PL","GR","GS","FZRA","FZDZ",
+        "FG","BR","HZ","FU","DU","SA","VA",
+        "SQ","FC","+FC","PO","DS","SS","NSW"
+    ]);
+
+    const tokens = raw
+        .replace(/=/g, " = ")
+        .trim()
+        .split(/\s+/);
+
+    const periods = [];
+
+    let current = null;
+
+    function finishCurrent() {
+        if (current) {
+            periods.push(current);
+        }
+    }
+
+    for (const token of tokens) {
+
+        //----------------------------------
+        // New forecast group
+        //----------------------------------
+        if (GROUP_STARTS.includes(token)) {
+
+            finishCurrent();
+
+            current = {
+                type: token,
+                issue: null,
+                validFrom: null,
+                validTo: null,
+                validFromText: null,
+                validToText: null,
+                wind: null,
+                visibility: null,
+                pressure: null,
+                temperature: null,
+                clouds: [],
+                weather: [],
+                other: [],
+                raw: token
+            };
+
+            continue;
+        }
+
+        if (!current)
+            continue;
+
+        current.raw += " " + token;
+
+        if (token === "=")
+            continue;
+
+        //----------------------------------
+        // Issue time
+        //----------------------------------
+        if (
+            current.issue === null &&
+            /^\d{6}$/.test(token)
+        ) {
+            current.issueText = token;
+            current.issue = makeWeatherDate(baseDate, token);
+            continue;
+        }
+
+        //----------------------------------
+        // Validity
+        //----------------------------------
+        if (/^\d{4}\/\d{4}$/.test(token)) {
+
+            const [from, to] = token.split("/");
+
+            current.validFromText = from;
+            current.validToText = to;
+
+            current.validFrom = makeWeatherDate(baseDate, from);
+            current.validTo = makeWeatherDate(baseDate, to);
+
+            if (current.validTo < current.validFrom) {
+                current.validTo.setUTCMonth(
+                    current.validTo.getUTCMonth() + 1
+                );
+            }
+            continue;
+        }
+
+        //----------------------------------
+        // Wind
+        //----------------------------------
+        if (/KT$|MPS$/.test(token)) {
+            current.wind = token;
+            continue;
+        }
+
+        //----------------------------------
+        // Visibility (FIXED)
+        //----------------------------------
+        if (token === "CAVOK") {
+            current.visibility = "CAVOK";
+            continue;
+        }
+
+        if (/^\d{4}$/.test(token)) {
+            current.visibility = token;
+            continue;
+        }
+
+        const visMatch = token.match(/\b\d{4}\b/);
+        if (visMatch && !current.visibility) {
+            current.visibility = visMatch[0];
+        }
+
+        //----------------------------------
+        // Pressure
+        //----------------------------------
+        if (/^Q\d{4}$/.test(token)) {
+            current.pressure = token;
+            continue;
+        }
+
+        //----------------------------------
+        // Temperature / Dewpoint
+        //----------------------------------
+        if (/^M?\d{2}\/M?\d{2}$/.test(token)) {
+            current.temperature = token;
+            continue;
+        }
+
+        //----------------------------------
+        // Clouds
+        //----------------------------------
+        if (/^(FEW|SCT|BKN|OVC|VV)/.test(token)) {
+            current.clouds.push(token);
+            continue;
+        }
+
+        //----------------------------------
+        // Weather phenomena
+        //----------------------------------
+        if (WEATHER_CODES.has(token)) {
+            current.weather.push(token);
+            continue;
+        }
+
+        current.other.push(token);
+    }
+
+    finishCurrent();
+
+    console.log("TOKENS:", tokens);
+    console.log("PARSED:", periods);
+
+    return periods;
+}
+
+const departureForecast = parseWeather(departureWX, depDateTime);
+const destinationForecast = parseWeather(destinationWX, arrDateTime);
+
+///WX Applicable Forecast
+function getApplicableForecast(periods, flightTime) {
+
+    let base = null;
+    const overlays = [];
+
+    for (const period of periods) {
+
+        if (period.type === "FT" || period.type === "SA") {
+
+            if (period.type === "SA") {
+                base = period;
+                continue;
+            }
+
+            if (
+                period.validFrom &&
+                period.validTo &&
+                flightTime >= period.validFrom &&
+                flightTime <= period.validTo
+            ) {
+                base = period;
+            }
+
+            continue;
+        }
+
+        if (
+            period.type === "TEMPO" ||
+            period.type === "INTER" ||
+            period.type === "PROB30" ||
+            period.type === "PROB40"
+        ) {
+
+            if (
+                period.validFrom &&
+                period.validTo &&
+                flightTime >= period.validFrom &&
+                flightTime <= period.validTo
+            ) {
+                overlays.push(period);
+            }
+
+            continue;
+        }
+    }
+
+    return { base, overlays };
+}
+
+///VIS ANALYSIS (FIXED CAVOK LOGIC)
+function analyseVisibility(applicable) {
+
+    const alerts = [];
+
+    const all = [
+        ...(applicable.base ? [applicable.base] : []),
+        ...(applicable.overlays || [])
+    ];
+
+    for (const period of all) {
+
+        if (!period.visibility)
+            continue;
+
+        const vis = period.visibility;
+
+        if (vis === "CAVOK") {
+            alerts.push({
+                type: "visibility",
+                severity: "info",
+                value: 10000,
+                source: period.type,
+                text: "CAVOK (≥10km visibility)"
+            });
+            continue;
+        }
+
+        const numVis = parseInt(vis, 10);
+
+        if (isNaN(numVis))
+            continue;
+
+        if (numVis === 9999) {
+            alerts.push({
+                type: "visibility",
+                severity: "info",
+                value: 9999,
+                source: period.type,
+                text: "Visibility ≥10 km"
+            });
+            continue;
+        }
+
+        let severity = "info";
+
+        if (numVis < 1500)
+            severity = "warning";
+        else if (numVis < 5000)
+            severity = "caution";
+
+        alerts.push({
+            type: "visibility",
+            severity,
+            value: numVis,
+            source: period.type,
+            text: `Visibility ${numVis} m`
+        });
+    }
+
+    return alerts;
+}
+
+
+
+///CLOUD BASE ANALYSIS
+function getCloudBase(period) {
+
+    if (!period.clouds || period.clouds.length === 0)
+        return null;
+
+    // No cloud / No significant cloud
+    if (
+        period.clouds.includes("NCD") ||
+        period.clouds.includes("NSC")
+    ) {
+        return null;
+    }
+
+    let lowest = null;
+
+    for (const c of period.clouds) {
+
+        // Extract cloud type and height
+        // e.g. BKN020, OVC005, VV002
+        const match = c.match(/^(FEW|SCT|BKN|OVC|VV)(\d{3})$/);
+
+        if (!match)
+            continue;
+
+        const type = match[1];
+        const height = parseInt(match[2], 10) * 100; // feet
+
+        // Vertical visibility always defines the ceiling
+        if (type === "VV") {
+            return {
+                base: height,
+                isVertical: true
+            };
+        }
+
+        // Ceiling is the lowest BKN or OVC layer
+        if (type === "BKN" || type === "OVC") {
+
+            if (lowest === null || height < lowest) {
+                lowest = height;
+            }
+        }
+    }
+
+    if (lowest === null)
+        return null;
+
+    return {
+        base: lowest,
+        isVertical: false
+    };
+}
+
+///RWY EXTRACTION
+///RUNWAY EXTRACTION
+async function extractRunways(pdf) {
+
+    const page = await pdf.getPage(1);
+    const textContent = await page.getTextContent();
+
+    const runways = [];
+
+    for (const item of textContent.items) {
+
+        const match = item.str.match(/[A-Z]{4}\/(\d{2}[LRC]?)/);
+
+        if (match) {
+            runways.push(match[1]);
+        }
+    }
+
+    return {
+        departure: runways[0] || null,
+        arrival: runways[1] || null
+    };
+}
+
+const runways = await extractRunways(pdf);
+
+const departureRunway = runways.departure;
+const arrivalRunway = runways.arrival;
+
+///RUNWAY HEADING
+function runwayHeading(runway) {
+
+    if (!runway)
+        return null;
+
+    const number = parseInt(runway, 10);
+
+    if (isNaN(number))
+        return null;
+
+    // Runway 36 = 360°
+    if (number === 36)
+        return 360;
+
+    return number * 10;
+}
+
+
+
+///WINDS
+function parseWind(windString, other = []) {
+
+    if (!windString)
+        return null;
+
+    const result = {
+        direction: null,
+        speed: 0,
+        gust: null,
+        variable: false,
+        variableRange: null
+    };
+
+    // VRB
+    if (windString.startsWith("VRB")) {
+        result.variable = true;
+
+        const m = windString.match(/^VRB(\d{2,3})(KT|MPS)$/);
+
+        if (m)
+            result.speed = parseInt(m[1], 10);
+    }
+    else {
+
+        const m = windString.match(/^(\d{3})(\d{2,3})(G(\d{2,3}))?(KT|MPS)$/);
+
+        if (m) {
+            result.direction = parseInt(m[1], 10);
+            result.speed = parseInt(m[2], 10);
+
+            if (m[4])
+                result.gust = parseInt(m[4], 10);
+        }
+    }
+
+    // Direction variation (240V310)
+    const vr = other.find(x => /^\d{3}V\d{3}$/.test(x));
+
+    if (vr) {
+
+        const [from, to] = vr.split("V");
+
+        result.variableRange = {
+            from: parseInt(from, 10),
+            to: parseInt(to, 10)
+        };
+    }
+
+    return result;
+}
+
+function analyseWind(period, runwayHeading) {
+    const alerts = [];
+
+    if (!period || !period.wind)
+        return alerts;
+
+    const wind = parseWind(period.wind, period.other);
+
+    if (!wind)
+        return alerts;
+
+    // -------------------
+    // Strong wind
+    // -------------------
+    if (wind.speed >= 25) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Strong wind (${wind.speed} kt)`
+        });
+    }
+
+    // -------------------
+    // Gusts
+    // -------------------
+    if (wind.gust !== null) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Wind gusts to ${wind.gust} kt`
+        });
+    }
+
+    // -------------------
+    // VRB
+    // -------------------
+    if (wind.variable) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Variable wind (possible tailwind or runway change)"
+        });
+    }
+
+    // -------------------
+    // Variable direction
+    // -------------------
+    if (wind.variableRange) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Wind direction variable ${wind.variableRange.from}°–${wind.variableRange.to}°`
+        });
+    }
+
+    // -------------------
+    // Crosswind
+    // -------------------
+    if (wind.direction !== null && wind.speed >= 10) {
+        let diff = Math.abs(wind.direction - runwayHeading);
+
+        if (diff > 180)
+            diff = 360 - diff;
+
+        if (diff > 60) {
+            alerts.push({
+                severity: "caution",
+                text: `Crosswind (${diff}° off runway)`
+            });
+        }
+    }
+
+    return alerts;
+}
+
+///TEMPERATURE ANALYSIS
+function analyseTemperature(period) {
+
+    const alerts = [];
+
+    if (!period || !period.temperature)
+        return alerts;
+
+    const tempText = period.temperature.split("/")[0];
+
+    // M02 -> -2
+    const temperature = tempText.startsWith("M")
+        ? -parseInt(tempText.slice(1), 10)
+        : parseInt(tempText, 10);
+
+    if (isNaN(temperature))
+        return alerts;
+
+    // -------------------
+    // Very hot
+    // -------------------
+    if (temperature > 40) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Very hot (${temperature}°C)`
+        });
+
+    }
+    // -------------------
+    // Hot
+    // -------------------
+    else if (temperature > 33) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Hot (${temperature}°C)`
+        });
+    }
+
+    // -------------------
+    // Very cold
+    // -------------------
+    if (temperature < -15) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Very cold (${temperature}°C)`
+        });
+
+    }
+    // -------------------
+    // Below freezing
+    // -------------------
+    else if (temperature < 0) {
+
+        alerts.push({
+            severity: "warning",
+            text: `Below freezing (${temperature}°C)`
+        });
+
+    }
+    // -------------------
+    // Cold
+    // -------------------
+    else if (temperature < 10) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Cold (${temperature}°C) - potential icing`
+        });
+    }
+
+    return alerts;
+}
+
+///THUNDERSTORM ANALYSIS
+function analyseThunderstorms(period) {
+
+    const alerts = [];
+
+    if (!period)
+        return alerts;
+
+    // -------------------
+    // Thunderstorm weather
+    // -------------------
+    const wx = period.weather || [];
+
+    if (
+        wx.includes("TS") ||
+        wx.includes("TSRA") ||
+        wx.includes("+TSRA") ||
+        wx.includes("-TSRA") ||
+        wx.includes("VCTS")
+    ) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Thunderstorms"
+        });
+    }
+
+    // -------------------
+    // Convective clouds
+    // -------------------
+    const clouds = period.clouds || [];
+
+    const hasCB = clouds.some(c => c.includes("CB"));
+    const hasTCU = clouds.some(c => c.includes("TCU"));
+
+    if (hasCB) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Cumulonimbus (CB)"
+        });
+
+    } else if (hasTCU) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Towering Cumulus (TCU)"
+        });
+
+    }
+
+    return alerts;
+}
+
+
+///PRESSURE ANALYSIS
+function analysePressure(period, phase) {
+
+    const alerts = [];
+
+    if (!period || !period.pressure)
+        return alerts;
+
+    const qnh = parseInt(period.pressure.replace("Q", ""), 10);
+
+    if (isNaN(qnh))
+        return alerts;
+
+    // -------------------
+    // High pressure
+    // -------------------
+    if (qnh > 1025) {
+
+        alerts.push({
+            severity: "caution",
+            text: `High pressure (QNH ${qnh})`
+        });
+    }
+
+    // -------------------
+    // Low pressure
+    // -------------------
+    if (qnh < 1000) {
+
+        alerts.push({
+            severity: "caution",
+            text: `Low pressure (QNH ${qnh})`
+        });
+    }
+
+    // -------------------
+    // Transition pressure change
+    // -------------------
+    const delta = qnh - 1013;
+
+    if (delta !== 0) {
+
+        const altitude = Math.abs(delta * 27);
+
+        if (phase === "departure") {
+
+            alerts.push({
+                severity: "info",
+                text: delta > 0
+                    ? `${altitude} ft gained changing to STD`
+                    : `${altitude} ft lost changing to STD`
+            });
+
+        } else {
+
+            alerts.push({
+                severity: "info",
+                text: delta > 0
+                    ? `${altitude} ft lost changing to QNH`
+                    : `${altitude} ft gained changing to QNH`
+            });
+
+        }
+    }
+
+    return alerts;
+}
+
+const destSA = destinationForecast.find(
+    p => p.type === "SA"
+);
+
+///WEATHER HAZARD ANALYSIS
+function analyseWeatherHazards(period) {
+
+    const alerts = [];
+
+    if (!period)
+        return alerts;
+
+    const wx = period.weather || [];
+
+    // -------------------
+    // Freezing precipitation
+    // -------------------
+    if (
+        wx.includes("FZRA") ||
+        wx.includes("FZDZ")
+    ) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Freezing precipitation"
+        });
+    }
+
+    // -------------------
+    // Fog
+    // -------------------
+    if (wx.includes("FG")) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Fog"
+        });
+    }
+
+    // -------------------
+    // Dust
+    // -------------------
+    if (wx.includes("DU")) {
+
+        alerts.push({
+            severity: "caution",
+            text: "Dust"
+        });
+    }
+
+    // -------------------
+    // Sand
+    // -------------------
+    if (wx.includes("SA")) {
+
+        alerts.push({
+            severity: "caution",
+            text: "Sand"
+        });
+    }
+
+    // -------------------
+    // Volcanic ash
+    // -------------------
+    if (wx.includes("VA")) {
+
+        alerts.push({
+            severity: "warning",
+            text: "Volcanic ash"
+        });
+    }
+
+    return alerts;
+}
+
+const depApplicable = resolveWeather(departureForecast, depDateTime);
+const destApplicable = resolveDestinationWeather(destinationForecast, arrDateTime);
+
+const depVis = analyseVisibility(depApplicable);
+const destVis = analyseVisibility(destApplicable);
+
+const depCloud = getCloudBase(depApplicable.base);
+const destCloud = getCloudBase(destApplicable.base);
+
+const depWind = analyseWind(
+    depApplicable.base,
+    runwayHeading(departureRunway)
+);
+
+const destWind = analyseWind(
+    destApplicable.base,
+    runwayHeading(arrivalRunway)
+);
+
+const depTemp = analyseTemperature(depApplicable.base);
+const destTemp = analyseTemperature(destApplicable.base);
+
+const depPressure = analysePressure(
+    depApplicable.base,
+    "departure"
+);
+
+const destPressure = analysePressure(
+    destSA,
+    "arrival"
+);
+
+const depTS = analyseThunderstorms(depApplicable.base);
+const destTS = analyseThunderstorms(destApplicable.base);
+
+const depHazards = analyseWeatherHazards(depApplicable.base);
+const destHazards = analyseWeatherHazards(destApplicable.base);
+
+function buildWeatherLines(...groups) {
+
+    const lines = [];
+    const infoLines = [];
+
+    for (const group of groups) {
+
+        if (!group)
+            continue;
+
+        for (const alert of group) {
+
+            if (
+                alert.severity === "warning" ||
+                alert.severity === "caution"
+            ) {
+                lines.push(alert.text);
+            }
+
+            else if (
+                alert.severity === "info" &&
+                (
+                    alert.text.includes("changing to STD") ||
+                    alert.text.includes("changing to QNH")
+                )
+            ) {
+                infoLines.push(alert.text);
+            }
+        }
+    }
+
+    // No cautions/warnings -> GOOD WEATHER first
+    if (lines.length === 0) {
+        lines.push("GOOD WEATHER");
+    }
+
+    // Always append QNH transition information afterwards
+    lines.push(...infoLines);
+
+    return lines;
+}
+
+const depWxLines = buildWeatherLines(
+    depVis,
+    depWind,
+    depTemp,
+    depPressure,
+    depTS,
+    depHazards
+);
+
+const destWxLines = buildWeatherLines(
+    destVis,
+    destWind,
+    destTemp,
+    destPressure,
+    destTS,
+    destHazards
+);
 
 
 
@@ -4565,6 +9604,1786 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillText(`WX CHARTS`, 5, tocY);
         }
 
+        ///WEATHER ANNOTATION
+        if (pageNum === 2) {
+
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            let y = 520;
+
+            /* ---------------- DEST ---------------- */
+            octx.fillText("DEST WX:", 600, y);
+            y += 15;
+
+            destWxLines.forEach((line, i) => {
+                octx.fillText(`${i + 1}. ${line}`, 600, y);
+                y += 12;
+            });
+
+            y = 630;
+
+            /* ---------------- DEP ---------------- */
+            octx.fillText("DEP WX:", 600, y);
+            y += 15;
+
+            depWxLines.forEach((line, i) => {
+                octx.fillText(`${i + 1}. ${line}`, 600, y);
+                y += 12;
+            });
+        }
+
+
+
+
+
+
+
+
+
+
+        /// END
+        wrapper.appendChild(pdfCanvas);
+        wrapper.appendChild(overlay);
+        viewer.appendChild(wrapper);
+
+        renderedPages.push({
+            pdfCanvas,
+            overlay
+        });
+    }
+});
+
+document.getElementById("downloadBtn").addEventListener("click", async () => {
+
+    if (renderedPages.length < 2) {
+        alert("Load an OFP first.");
+        return;
+    }
+
+    const { jsPDF } = window.jspdf;
+
+    const pdf = new jsPDF({
+        orientation: "portrait",
+        unit: "px",
+        format: [
+            renderedPages[0].pdfCanvas.width,
+            renderedPages[0].pdfCanvas.height
+        ]
+    });
+
+    for (let p = 0; p < renderedPages.length; p++) {
+
+        const page = renderedPages[p];
+
+        const merged = document.createElement("canvas");
+        merged.width = page.pdfCanvas.width;
+        merged.height = page.pdfCanvas.height;
+
+        const ctx = merged.getContext("2d");
+
+        ctx.drawImage(page.pdfCanvas, 0, 0);
+        ctx.drawImage(page.overlay, 0, 0);
+
+        const img = merged.toDataURL("image/jpeg", 1.0);
+
+        if (p === 0) {
+
+            if (sidOutputPage) {
+                pdf.link(5, 1055, 70, 15, {
+                    pageNumber: sidOutputPage
+                });
+            }
+
+            if (atcOutputPage) {
+                pdf.link(5, 1090, 70, 15, {
+                    pageNumber: atcOutputPage
+                });
+            }
+
+            if (wxOutputPage) {
+                pdf.link(5, 1110, 70, 15, {
+                    pageNumber: wxOutputPage
+                });
+            }
+
+            if (notamOutputPage) {
+                pdf.link(5, 1128, 70, 15, {
+                    pageNumber: notamOutputPage
+                });
+            }
+
+            if (crewOutputPage) {
+                pdf.link(5, 1146, 70, 15, {
+                    pageNumber: crewOutputPage
+                });
+            }
+
+            if (edtoOutputPage) {
+                pdf.link(5, 1073, 70, 15, {
+                    pageNumber: edtoOutputPage
+                });
+            }
+
+            if (weatherChartsOutputPage) {
+                pdf.link(5, 1164, 70, 15, {
+                    pageNumber: weatherChartsOutputPage
+                });
+            }
+        }
+
+        if (p > 0) {
+            pdf.addPage(
+                [merged.width, merged.height],
+                merged.width > merged.height ? "landscape" : "portrait"
+            );
+        }
+
+        pdf.addImage(
+            img,
+            "JPEG",
+            0,
+            0,
+            merged.width,
+            merged.height
+        );
+    }
+
+    const fileName =
+        dep && arr && date
+            ? `${dep}${arr}${date}.pdf`
+            : "Annotated_OFP.pdf";
+
+    pdf.save(fileName);
+});
+
+</script>
+
+</body>
+</html>
+    depPressure,
+    depTS,
+    depHazards
+);
+
+const destWxLines = buildWeatherLines(
+    destVis,
+    destWind,
+    destTemp,
+    destPressure,
+    destTS,
+    destHazards
+);
+
+
+
+
+
+
+
+
+
+
+
+
+for (let i = 0; i < pagesToRender.length; i++) {
+
+    const p = pagesToRender[i];
+
+    if (p === sidPage && sidOutputPage === null) {
+        sidOutputPage = i + 1;
+    }
+
+    if (p === edtoStartPage && edtoOutputPage === null) {
+        edtoOutputPage = i + 1;
+    }
+
+    if (p === atcFlightPlanPage && atcOutputPage === null) {
+        atcOutputPage = i + 1;
+    }
+
+    if (p === airportWxStartPage && wxOutputPage === null) {
+        wxOutputPage = i + 1;
+    }
+
+    if (p === notamStartPage && notamOutputPage === null) {
+        notamOutputPage = i + 1;
+    }
+
+    if (p === crewBulletinStartPage && crewOutputPage === null) {
+        crewOutputPage = i + 1;
+    }
+
+    if (
+    p === weatherChartsPage && weatherChartsOutputPage === null) {
+        weatherChartsOutputPage = i + 1;
+    }
+}
+
+    for (const pageNum of pagesToRender) {
+
+        const page = await pdf.getPage(pageNum);
+        const viewport = page.getViewport({ scale });
+
+        const wrapper = document.createElement("div");
+        wrapper.className = "pageWrapper";
+
+        /* PDF canvas */
+        const pdfCanvas = document.createElement("canvas");
+        const pdfCtx = pdfCanvas.getContext("2d");
+
+        pdfCanvas.className = "pdfCanvas";
+        pdfCanvas.width = viewport.width;
+        pdfCanvas.height = viewport.height;
+
+        await page.render({
+            canvasContext: pdfCtx,
+            viewport
+        }).promise;
+
+        /* overlay */
+        const overlay = document.createElement("canvas");
+        const octx = overlay.getContext("2d");
+
+        overlay.className = "overlayCanvas";
+        overlay.width = viewport.width;
+        overlay.height = viewport.height;
+
+        octx.clearRect(0, 0, overlay.width, overlay.height);
+        octx.globalAlpha = 1;
+
+        const textContent = await page.getTextContent();
+        const text = textContent.items.map(i => i.str).join(" ");
+
+
+        ///DECLARED VARIABLES
+
+        let depTime = null;
+        let arrTime = null;
+
+        let depPos = null;
+        let arrPos = null;
+
+        let burnTime = null;
+        let burnoffTime = null;
+
+        let altnFuelValue = null;
+        let altnFuelPos = null;
+        let altnFuelHoldValue = null;
+
+        let altnAirport = null;
+        let altnAirportPos = null;
+
+        let ptow = null;
+
+        let afterRteNo = false;
+        let captFound = false;
+
+        let contingencyFuel = null;
+        let excessFuel = null;
+        let reserveFuel = null;
+
+
+        function calcExcess(rtow, ptow) {
+            if (rtow == null || ptow == null) return null;
+            return Math.round((rtow - ptow) * 10) / 10;
+        }
+
+        function burnoffToMinutes(t) {
+
+            const parts = t.split(".");
+
+            const h = parseInt(parts[0] || "0", 10);
+            const m = parseInt(parts[1] || "0", 10);
+
+            return (h * 60) + m;
+        }
+
+        function diffHM(dep, arr) {
+
+            const dH = parseInt(dep.slice(0,2), 10);
+            const dM = parseInt(dep.slice(2,4), 10);
+
+            const aH = parseInt(arr.slice(0,2), 10);
+            const aM = parseInt(arr.slice(2,4), 10);
+
+            let total = (aH * 60 + aM) - (dH * 60 + dM);
+
+            if (total < 0) total += 1440;
+
+            return {
+                totalMinutes: total,
+                hours: Math.floor(total / 60),
+                mins: total % 60
+            };
+        }
+        
+        function flightToMinutes(t) {
+
+                const [h, m] = t.split(".").map(Number);
+
+                return (h * 60) + m;
+            }
+
+        function toHM(total) {
+
+            return {
+                hours: Math.floor(total / 60),
+                mins: total % 60
+            };
+        }        
+
+        function convertFuel(raw) {
+            const num = parseInt(raw, 10);
+            if (isNaN(num)) return null;
+
+            const val = num / 1000;
+            return Math.ceil(val * 10) / 10;
+        }
+
+        function sumAltFuel(val1, val2) {
+            const n1 = parseInt(val1, 10);
+            const n2 = parseInt(val2, 10);
+
+            if (isNaN(n1) || isNaN(n2)) return null;
+
+            const total = (n1 + n2) / 1000;
+            return Math.ceil(total * 10) / 10;
+        }
+
+        function convertZFW(raw) {
+            const num = parseInt(raw, 10);
+            if (isNaN(num)) return null;
+
+            const val = num / 1000;
+            return Math.ceil(val * 10) / 10;
+        }
+
+        
+        for (const notam of extractedNotams) {
+
+            if (!shouldHighlightNotam(notam))
+                continue;
+
+            for (const row of notam.rows) {
+
+                const rowUpper = row.text.toUpperCase();
+
+                const highlightRow =
+                    containsKeyword(rowUpper, GROUP_A) ||
+                    containsKeyword(rowUpper, GROUP_B);
+
+                if (!highlightRow)
+                    continue;
+
+                for (const item of row.items) {
+
+                    if (item.page !== pageNum)
+                        continue;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255,235,59,0.45)";
+
+                    octx.fillRect(
+                        item.tx - 2,
+                        item.ty - 12,
+                        item.width + 4,
+                        18
+                    );
+
+                    octx.restore();
+                }
+            }
+        }
+
+
+
+    
+
+
+        /* -----------------------------
+        LOOP TEXT
+        ----------------------------- */
+        for (let i = 0; i < textContent.items.length; i++) {
+
+            const item = textContent.items[i];
+            const str = (item.str || "");
+            const upper = str.toUpperCase();
+
+            if (upper.includes("RTE NO")) {
+                afterRteNo = true;
+                captFound = false; // reset per page
+                continue;
+            }
+
+            ///SAVE DETAILS
+            if (pageNum === 1 && str.includes("SIA")) {
+                const routeMatch = str.match(/([A-Z]{3})\/([A-Z]{3})/);
+
+                if (routeMatch) {
+                    dep = routeMatch[1];
+                    arr = routeMatch[2];
+                }
+
+                const dateMatch = str.match(/\d{2}[A-Z]{3}\d{2}/);
+
+                if (dateMatch) {
+                    date = dateMatch[0];
+                }
+            }
+
+            ///PLAN NUMBER
+            if (pageNum === 1) {
+                if (upper.startsWith("PLAN")) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                    octx.restore();
+                }
+            }
+            ///AIRCRAFT TYPE + CAPTAIN
+            if (pageNum === 1 && afterRteNo && !captFound) {
+
+                if (upper.includes("CAPT")) {
+
+                    captFound = true;
+
+                    const t = item.transform;
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    // -------------------------
+                    // highlight CAPT
+                    // -------------------------
+                    octx.save();
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+                    octx.restore();
+
+                    // -------------------------
+                    // highlight aircraft type (previous token)
+                    // -------------------------
+                    const prev = textContent.items[i - 2];
+
+                    if (prev && prev.str) {
+                        const pt = prev.transform;
+
+                        const ptx = pt[4] * scale;
+                        const pty = viewport.height - (pt[5] * scale);
+
+                        const pwidth = prev.str.length * 9;
+
+                        octx.save();
+                        octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                        octx.fillRect(ptx, pty - 12, pwidth, 18);
+                        octx.restore();
+                    }
+                }
+            }
+
+
+            ///REGISTRATION
+            if (pageNum === 1) {
+                if (upper.startsWith("9V")) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                    octx.restore();
+                }       
+            }
+            ///Flight Number
+            if (pageNum === 1) {
+                if (upper.startsWith("SIA") && str.length < 9) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                    octx.restore();
+                }
+            }
+            ///DEP/ARR
+            if (pageNum === 1) {
+                if (/^[A-Z]{3}\/[A-Z]{3}$/.test(upper)) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const textWidth = str.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                    octx.restore();
+                }
+            }
+
+            /* ---------------- DEP ---------------- */
+            if (pageNum === 1) {
+              if (upper.includes("DEP")) {
+
+                  const timeMatch = str.match(/\d{4}/);
+
+                  if (timeMatch) {
+
+                      depTime = timeMatch[0];
+
+                      const tx = item.transform[4] * scale;
+                      const ty = viewport.height - (item.transform[5] * scale);
+
+                      const charWidth = 9;
+                      const startX = tx + (10 * charWidth);
+                      const width = 4 * charWidth;
+
+                      octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                      octx.fillRect(startX, ty - 10, width, 15);
+
+                      depPos = { tx, ty };
+                  }
+              }
+            }
+            /* ---------------- ARR ---------------- */
+            if (pageNum === 1) {
+                if (upper.includes("ARR")) {
+
+                    const timeMatch = str.match(/\d{4}/);
+
+                    if (timeMatch) {
+
+                        arrTime = timeMatch[0];
+
+                        const tx = item.transform[4] * scale;
+                        const ty = viewport.height - (item.transform[5] * scale);
+
+                        const charWidth = 9;
+                        const startX = tx + (10 * charWidth);
+                        const width = 4 * charWidth;
+
+                        octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                        octx.fillRect(startX, ty - 10, width, 15);
+
+                        arrPos = { tx, ty };
+                    }
+                }
+              }
+
+
+              
+            ///APD
+            if (pageNum === 1) {
+              if (upper.includes("APD")) {
+
+                  const target = str;
+
+                  if (!target) continue;
+
+                  const last3 = target.slice(-3);
+
+                  const t = item.transform;
+
+                  const tx = t[4] * scale;
+                  const ty = viewport.height - (t[5] * scale);
+
+                  const textWidth = last3.length * 9;
+                  const textHeight = 18;
+
+                  octx.save();
+
+                  octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                  octx.fillRect(tx + (target.length - 3) * 9, ty - 12, textWidth, textHeight);
+
+                  octx.restore();
+              }
+            }
+            /// Flight time highlight
+            if (pageNum === 1) {
+              if (upper.includes("BURNOFF")) {
+
+                  const valueItem = textContent.items[i + 2];
+
+                  if (!valueItem || !valueItem.str) continue;
+
+                  const burnTime = valueItem.str;
+
+                  // must be 12.34 format
+                  if (!/^\d{2}\.\d{2}$/.test(burnTime)) continue;
+
+                  // safe fallback if transform missing
+                  const t = valueItem.transform || item.transform;
+
+                  const tx = t[4] * scale;
+                  const ty = viewport.height - (t[5] * scale);
+
+                  const charWidth = 9;
+                  const width = burnTime.length * charWidth;
+
+                  octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                  octx.fillRect(tx, ty - 10, width, 15);
+
+                  burnoffTime = burnTime;
+              }
+            }
+            ///Burn-off
+            if (upper.includes("BURNOFF")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///Contingency
+            if (upper.includes("CONT")) {
+
+                const valueItem = textContent.items[i + 4];
+
+                if (valueItem && valueItem.str) {
+                    const converted = convertFuel(valueItem.str);
+
+                    if (converted !== null) {
+
+                        contingencyFuel = converted;
+
+                        const t = valueItem.transform || item.transform;
+                        const tx = t[4] * scale;
+                        const ty = viewport.height - (t[5] * scale);
+
+                        octx.fillStyle = "blue";
+                        octx.font = "12px Helvetica";
+                        octx.fillText(converted, tx + 65, ty);
+                    }
+                }
+            }
+
+            ///ALTN FUEL
+            if (upper.includes("ALTN FUEL")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///ALTN HOLD
+            if (upper.includes("ALTN HOLD")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///TAXI FUEL
+            if (upper.includes("TAXI FUEL")) {
+
+                const valueItem = textContent.items[i + 2]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///FLT PLAN REQMT
+            if (upper.includes("FLT PLAN REQMT")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            ///EXCESS FUEL
+            if (i < 50) continue;
+
+            if (upper.includes("EXCESS FUEL")) {
+
+                const valueItem = textContent.items[i + 4];
+
+                if (valueItem && valueItem.str) {
+                    const converted = convertFuel(valueItem.str);
+
+                    if (converted !== null) {
+
+                        excessFuel = converted;
+
+                        const t = valueItem.transform || item.transform;
+
+                        const tx = t[4] * scale;
+                        const ty = viewport.height - (t[5] * scale);
+
+                        octx.fillStyle = "blue";
+                        octx.font = "12px Helvetica";
+                        octx.fillText(converted, tx + 65, ty);
+                    }
+                }
+            }
+
+            ///FUEL IN TANKS
+            if (upper.includes("FUEL IN TANKS")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(converted, tx + 65, ty);
+            }
+
+            /// RESERVES
+            if (upper.includes("ALTN FUEL")) {
+
+                const fuelItem = textContent.items[i + 4];
+
+                if (fuelItem && fuelItem.str) {
+
+                    altnFuelValue = fuelItem.str;
+
+                    const t = fuelItem.transform || item.transform;
+
+                    altnFuelPos = {
+                        tx: t[4] * scale,
+                        ty: viewport.height - (t[5] * scale)
+                    };
+                }
+            }
+            
+            ///RESERVES
+            if (upper.includes("ALTN HOLD")) {
+
+                const holdItem = textContent.items[i + 4];
+
+                if (holdItem && holdItem.str) {
+                    altnFuelHoldValue = holdItem.str;
+                }
+            }
+
+            ///ALTN AIRPORT
+            if (upper.startsWith("ALTN")) {
+
+                const token = textContent.items[i].str || "";
+
+                // match ALTN XXX (YYYY)
+                const match = token.match(/\(([^)]+)\)/);
+
+                if (match && match[1]) {
+
+                    altnAirport = match[1];
+
+                    const t = item.transform;
+
+                    altnAirportPos = {
+                        tx: t[4] * scale,
+                        ty: viewport.height - (t[5] * scale)
+                    };
+                }
+            }
+
+            ///LANDING FUEL
+            let ldgFuel = null;
+
+            reserveFuel = sumAltFuel(altnFuelValue, altnFuelHoldValue);
+
+            if (
+                contingencyFuel !== null &&
+                excessFuel !== null &&
+                altnFuelValue !== null &&
+                altnFuelHoldValue !== null
+            ) {
+                ldgFuel =
+                    contingencyFuel +
+                    excessFuel+
+                    reserveFuel;
+
+                ldgFuel = Math.ceil(ldgFuel * 10) / 10;
+            }
+
+            if (upper.includes("FUEL IN TANKS")) {
+
+                const valueItem = textContent.items[i + 4]; // 4 tokens after
+
+                if (!valueItem || !valueItem.str) continue;
+
+                const converted = convertFuel(valueItem.str);
+
+                if (converted === null) continue;
+
+                const t = valueItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const charWidth = 9;
+                const width = (String(converted).length + 2) * charWidth;
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+                octx.fillText(`LDG FUEL: ${ldgFuel}`, tx, ty + 20);
+            }
+
+            /// PZFW
+            if (str.replace(/\s/g, "").toUpperCase().startsWith("PZFW")) {
+
+                // remove spaces, then isolate digits after PZFW
+                const cleaned = str.replace(/\s/g, "").toUpperCase();
+
+                const match = cleaned.match(/^PZFW(\d+)$/);
+
+                if (!match) continue;
+
+                const raw = match[1];
+
+                const num = parseInt(raw, 10);
+                if (isNaN(num)) continue;
+
+                const converted = Math.ceil((num / 1000) * 10) / 10;
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+
+                octx.fillText(converted, tx + 110, ty + 1);
+            }
+
+            ///PTOW
+            if (str.replace(/\s/g, "").toUpperCase().startsWith("PTOW")) {
+
+                // remove spaces, then isolate digits after PZFW
+                const cleaned = str.replace(/\s/g, "").toUpperCase();
+
+                const match = cleaned.match(/^PTOW(\d+)$/);
+
+                if (!match) continue;
+
+                const raw = match[1];
+
+                const num = parseInt(raw, 10);
+                if (isNaN(num)) continue;
+
+                const converted = Math.ceil((num / 1000) * 10) / 10;
+                ptow = converted;
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+
+                octx.fillText(converted, tx + 110, ty + 1);
+            }
+
+            ///PLWT
+            if (str.replace(/\s/g, "").toUpperCase().startsWith("PLWT")) {
+
+                // remove spaces, then isolate digits after PZFW
+                const cleaned = str.replace(/\s/g, "").toUpperCase();
+
+                const match = cleaned.match(/^PLWT(\d+)$/);
+
+                if (!match) continue;
+
+                const raw = match[1];
+
+                const num = parseInt(raw, 10);
+                if (isNaN(num)) continue;
+
+                const converted = Math.ceil((num / 1000) * 10) / 10;
+
+                const t = item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+
+                octx.fillText(converted, tx + 110, ty + 1);
+                
+                if (rtow !== null) {
+
+                    octx.fillStyle = "blue";
+                    octx.font = "12px Helvetica";
+
+                    octx.fillText(
+                        `RTOW ${rtow}`,
+                        tx + 71,
+                        ty + 18 // slightly below PLWT line
+                    );
+                }
+
+                const excess = calcExcess(rtow, ptow);
+
+                if (excess !== null) {
+
+                    octx.fillStyle = "blue";
+                    octx.font = "12px Helvetica";
+
+                    octx.fillText(
+                        `EXCESS  ${excess}`,
+                        tx + 62,
+                        ty + 32
+                    );
+                }
+
+            }
+
+            ///BURN ADD/LESS
+            if (upper.includes("BURN ADD") || upper.includes("BURN LESS")) {
+
+                const targetItem = textContent.items[i + 2];
+
+                if (!targetItem || !targetItem.str) continue;
+
+                const raw = targetItem.str;
+
+                // take first 6 characters
+                const value = raw.slice(0, 6);
+
+                if (!value) continue;
+
+                const t = targetItem.transform || item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = value.length * 9;
+                const textHeight = 18;
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                octx.fillRect(tx, ty - 12, textWidth, textHeight);
+
+                octx.restore();
+            }
+
+            ///LEGS PAGES HIGHLIGHTS
+            if (
+                sidPage !== null &&
+                starPage !== null &&
+                pageNum >= sidPage &&
+                pageNum <= starPage
+            ) {
+
+                const token = (item.str || "").trim();
+                const match = token.match(/\d{3}\*\d{4}/);
+
+                if (match) {
+
+                    const tx = item.transform[4] * scale;
+                    const ty = viewport.height - (item.transform[5] * scale);
+
+                    // Find where the match starts inside the string
+                    const startIndex = token.indexOf(match[0]);
+
+                    // Approximate character width
+                    const charWidth = (item.width * scale) / token.length;
+
+                    const highlightX = tx + (startIndex * charWidth);
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 0, 0, 0.35)";
+
+                    octx.fillRect(
+                        highlightX,
+                        ty - 12,
+                        charWidth * 4,   // highlight only XXX*
+                        18
+                    );
+
+                    octx.restore();
+                  }
+
+                let colour = null;
+
+                if (
+                    ["004","005","006","007","008","009"]
+                    .includes(token)
+                ) {
+                    colour = "rgba(255, 235, 59, 0.5)";
+                }
+
+                if (
+                    ["010","011","012","013","014",
+                    "015","016","017","018"]
+                    .includes(token)
+                ) {
+                    colour = "rgba(255, 0, 0, 0.35)";
+                }
+
+                if (colour) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    let textWidth = token.length * 9;
+                    const textHeight = 18;
+
+                    octx.save();
+
+                    octx.fillStyle = colour;
+
+                    octx.fillRect(
+                        tx,
+                        ty - 12,
+                        textWidth,
+                        textHeight
+                    );
+
+                    octx.restore();
+                }
+            }
+
+
+            ///HIGH GROUND AIRPORT WX HIGHLIGHTS
+            ///AIRPORT WX HIGHLIGHTS
+            if (
+                airportWxStartPage !== null &&
+                airportWxEndPage !== null &&
+                pageNum >= airportWxStartPage &&
+                pageNum <= airportWxEndPage
+            ) {
+
+                const token = (item.str || "").trim().toUpperCase();
+
+                const wxAirports = [
+                    "VIDP",
+                    "VAAH",
+                    "LTFM",
+                    "LTAC",
+                    "LOWW",
+                    "UBBB",
+                    "UATE",
+                    "OIMM",
+                    "UZTT",
+                    "UTAA"
+                ];
+
+                const matchedAirport = wxAirports.find(icao =>
+                    token.includes(icao)
+                );
+
+                if (matchedAirport) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    const startIndex = token.indexOf(matchedAirport);
+
+                    const charWidth = (item.width * scale) / token.length;
+
+                    const highlightX = tx + (startIndex * charWidth);
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+
+                    octx.fillRect(
+                        highlightX,
+                        ty - 12,
+                        charWidth * matchedAirport.length,
+                        18
+                    );
+
+                    octx.restore();
+                }
+            }
+
+            ///DESTINATION NOTAMS ANNOTATE
+            if (
+                pageNum >= notamStartPage &&
+                pageNum <= notamEndPage
+            ) {
+
+                const token = (item.str || "").trim().toUpperCase();
+
+                if (token.includes("DESTINATION AIRPORT")) {
+
+                    const t = item.transform;
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    octx.save();
+
+                    octx.font = "bold 24px Arial";
+                    octx.fillStyle = "red";
+
+                    octx.fillText(
+                        "DESTINATION NOTAMS",
+                        tx + (item.width * scale) + 20,
+                        ty
+                    );
+
+                    octx.restore();
+                  }
+              }
+
+
+            
+              
+            ///NEXT
+
+
+
+        }
+
+
+
+
+
+
+
+
+
+
+
+
+        /* -----------------------------
+        ANNOTATION (ONCE ONLY)
+        ----------------------------- */
+        if (depTime && arrTime && arrPos) {
+
+            const diff = diffHM(depTime, arrTime);
+
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+
+            octx.fillText(
+                `BLK: ${diff.hours}h ${diff.mins}m`,
+                arrPos.tx + 180,
+                arrPos.ty
+            );
+        }
+
+        /// VWS Annotation
+        if (pageNum === 1) {
+
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            octx.fillText("VWS:", 738, 145);
+
+            let y = 160;
+
+            for (const r of results) {
+
+                octx.fillText(
+                    `${r.before2 || "?"} ${r.before5 || "?"} ${r.match}`,
+                    738,
+                    y
+                );
+
+                y += 15;
+            }
+
+            y += 20
+            octx.fillText("CLB SCHED:", 738, y);
+
+            y += 15
+            for (const m of matches) {
+                octx.fillText(`FL${m.code} : ${m.value} ${m.waypointBefore}`, 738, y);
+                y += 15;
+            }
+        }
+        ///Excess block time
+        if (depTime && arrTime && burnoffTime) {
+
+            const block = diffHM(depTime, arrTime).totalMinutes;
+            const flight = burnoffToMinutes(burnoffTime);
+
+            const diff = block - flight;
+
+            const diffHours = Math.floor(diff / 60);
+            const diffMins = diff % 60;
+
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+
+            octx.fillText(
+                `NET: ${diffHours}h ${diffMins}m`,
+                arrPos.tx + 180,
+                arrPos.ty + 15
+            );
+        }
+
+        //crew rest
+        if (burnoffTime) {
+
+                const flightMin = flightToMinutes(burnoffTime);
+
+                // ONLY apply rule if > 8 hours
+                if (flightMin > 480) {
+
+                    const adjusted = flightMin - 90; // subtract 1h30
+
+                    const half = Math.floor(adjusted / 2);
+                    const third = Math.floor(adjusted / 3);
+
+                    const halfHM = toHM(half);
+                    const thirdHM = toHM(third);
+
+                    octx.fillStyle = "blue";
+                    octx.font = "12px Helvetica";
+                    
+                    octx.fillText("Crew Rest:", 750, 1088);
+
+                    octx.fillText(
+                        `DBL: ${halfHM.hours}h ${halfHM.mins}m`,
+                        750,
+                        1100
+                    );
+
+                    octx.fillText(
+                        `AUG: ${thirdHM.hours}h ${thirdHM.mins}m`,
+                        750,
+                        1112
+                    );
+                }
+            }
+
+
+        ///Reserves
+        if (altnFuelValue && altnFuelHoldValue && altnFuelPos) {
+
+            const result = sumAltFuel(altnFuelValue, altnFuelHoldValue);
+
+            if (result !== null) {
+
+                octx.fillStyle = "blue";
+                octx.font = "12px Helvetica";
+
+                octx.fillText(
+                    `> ${result} ${altnAirport}`,
+                    altnFuelPos.tx + 90,
+                    altnFuelPos.ty + 5
+                );
+            }
+        }
+
+        ///SIDSTAR
+        if (pageNum === 1) {
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+
+            octx.fillText(
+                `DEP: ${sidLine || "Not found"}`,
+                670,
+                43
+            );
+
+            octx.fillText(
+                `ARR: ${starLine || "Not found"}`,
+                670,
+                58
+            );
+        }
+
+        ///HIGH GROUND
+        if (pageNum === 1) {
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            octx.fillText("HIGH GROUND:", 620, 145);
+
+            let y = 160;
+
+            for (const c of codeList) {
+
+                octx.fillText(
+                    `${c.before16 || "?"} | ${c.code} | ${c.before17 || "?"}`,
+                    620,
+                    y
+                );
+
+                y += 15;
+            }
+
+        }
+
+        ///EDTO INFO
+        if (pageNum === 1 && edtoGroups.length > 0) {
+
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+
+            let y = 145;
+
+            for (const g of edtoGroups) {
+
+                octx.fillText("EDTO:", 5, y);
+                y += 15;
+
+                octx.fillText(`A1: ${g.airport1 || "-"}`, 5, y); y += 15;
+                octx.fillText(`${g.start || "-"}`, 5, y); y += 15;
+                octx.fillText(`A2: ${g.airport2 || "-"}`, 5, y); y += 15;
+                octx.fillText(`A3: ${g.airport3 || "-"}`, 5, y); y += 15;
+                octx.fillText(`${g.end || "-"}`, 5, y); y += 15;
+                octx.fillText(`A4: ${g.airport4 || "-"}`, 5, y); y += 25;
+            }
+        }
+
+        ///FIR
+        if (pageNum === 2) {
+
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            let y = 750;
+
+            octx.fillText("FIR INFO:", 65, y);
+
+            y += 15;
+
+            for (const a of annotations) {
+
+            const x1 = 65;   // time
+            const x2 = 95;  // FIR code - FIR name
+            const x3 = 240;  // waypoint
+            const x4 = 280;  // fallback time
+            const x5 = 330;  // country
+
+            // TIME
+            octx.fillText(a.time || "", x1, y);
+
+            // FIR CODE - FIR NAME
+            octx.fillText(
+                `${a.fir || ""} - ${a.firName || "not in database"}`,
+                x2,
+                y
+            );
+
+            // WAYPOINT
+            octx.fillText(a.waypoint || "", x3, y);
+
+            // FALLBACK TIME
+            if (a.fallbackTime) {
+                octx.fillText(`(${a.fallbackTime})`, x4, y);
+            }
+
+            // COUNTRY
+            octx.fillText(a.country || "", x5, y);
+
+            y += 15;
+            }
+        }
+
+        ///WEATHER ANNOTATION
+        if (pageNum === 2) {
+
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            let y = 520;
+
+            /* ---------------- DEST ---------------- */
+            octx.fillText("Destination WX:", 65, y);
+            y += 15;
+
+            for (const weatherLine of destLines) {
+
+                octx.fillText(weatherLine, 65, y);
+                y += 12;
+            }
+
+            y = 630;
+
+            /* ---------------- DEP ---------------- */
+            octx.fillText("Departure WX:", 65, y);
+            y += 15;
+
+            for (const weatherLine of depLines) {
+
+                octx.fillText(weatherLine, 65, y);
+                y += 12;
+            }
+        }
+
+
+        /// WIND ARROWS RENDER
+        if (pageNum === 2) {
+
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            octx.fillText("CLB WINDS:", 600, 750);
+
+            let x = 630;
+            let y = 780;
+
+            for (const w of clbWinds) {
+
+                drawWindArrow(octx, x, y, w.dir, w.spd);
+
+                x += 50; // spacing between wind blocks
+            }
+
+            y += 10;
+
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            octx.fillText("DES WINDS:", 600, 830);
+
+            x = 630;
+            y = 860;
+
+            for (const w of desWinds) {
+
+                drawWindArrow(octx, x, y, w.dir, w.spd);
+
+                x += 50;
+            }
+        }
+
+        ///WIND ARROW FL LABELS CLB
+        if (pageNum === 2) {
+            const flSpacing = 50; // ← change this to control spacing
+
+            const fls = ["100", "180", "240", "300"];
+
+            octx.fillStyle = "blue";
+            octx.font = "8px Helvetica";
+
+            let x = 630;
+            const y = 760;
+
+            for (const fl of fls) {
+
+                octx.fillText(`FL${fl}`, x, y);
+
+                x += flSpacing;
+            }
+        }
+
+        ///WIND ARROW FL LABELS DES
+        if (pageNum === 2) {
+            const flSpacing = 50; // adjust spacing between FLs
+
+            const fls = ["350", "310", "200", "100"];
+
+            octx.fillStyle = "blue";
+            octx.font = "8px Helvetica";
+
+            let x = 630;
+            const y = 840;
+
+            for (const fl of fls) {
+
+                octx.fillText(`FL${fl}`, x, y);
+
+                x += flSpacing;
+            }
+        }
+
+
+
+        ///PAGE TITLES
+        ///ATC FLIGHT PLAN
+        if (pageNum === atcFlightPlanPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "ATC FLIGHT PLAN",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // ROUTE
+        if (pageNum === sidPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "ROUTE LEGS",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // EDTO
+        if (pageNum === edtoStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "EDTO INFORMATION",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // AIRPORT WEATHER
+        if (pageNum === airportWxStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "WEATHER/TAF",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+        
+        // NOTAMS
+        if (pageNum === notamStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "NOTAMS DEP/ARR",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        // INTAMS
+        if (pageNum === crewBulletinStartPage) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillText(
+                "INTAMS",
+                20,
+                50
+            );
+
+            octx.restore();
+        }
+
+        if (pageNum === pdf.numPages) {
+            const startY = 190;
+            const lineHeight = 20;
+
+            octx.font = "12px Helvetica";
+            octx.fillStyle = "blue";
+
+            bulletinAnnotations.forEach((m, idx) => {
+                octx.fillText(`${idx + 1}. ${m}`, 65, startY + idx * lineHeight);
+            });
+        }
+
+        if (pageNum === 1) {
+
+            let tocY = 1050;
+
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
+            octx.fillText("Quick Links:", 5, tocY);
+
+            tocY += 18;
+            octx.font = "12px Helvetica";
+
+            octx.fillText(`LEGS`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`EDTO`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`ATC FLT PLN`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`WEATHER`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`NOTAMS`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`INTAMS`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`WX CHARTS`, 5, tocY);
+        }
+
+        ///WEATHER ANNOTATION
+        if (pageNum === 2) {
+
+            octx.fillStyle = "blue";
+            octx.font = "10px Helvetica";
+
+            let y = 520;
+
+            /* ---------------- DEST ---------------- */
+            octx.fillText("DEST WX:", 600, y);
+            y += 15;
+
+            destWxLines.forEach((line, i) => {
+                octx.fillText(`${i + 1}. ${line}`, 600, y);
+                y += 12;
+            });
+
+            y = 630;
+
+            /* ---------------- DEP ---------------- */
+            octx.fillText("DEP WX:", 600, y);
+            y += 15;
+
+            depWxLines.forEach((line, i) => {
+                octx.fillText(`${i + 1}. ${line}`, 600, y);
+                y += 12;
+            });
+        }
 
 
 
