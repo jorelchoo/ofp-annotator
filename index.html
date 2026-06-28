@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v1.2</h2>
+    <h2>OFP Annotation Tool v1.3</h2>
 </div>
 
 <div class="upload">
@@ -1491,8 +1491,6 @@ function initFIRDatabase() {
             }
         ])
     );
-
-    console.log("FIR loaded:", firLookup.size);
 }
 
 initFIRDatabase();
@@ -1523,6 +1521,53 @@ function diffHM(dep, arr) {
     };
 }
 
+///NOTAM DATE FUNCTION
+function parseNotamDate(dateStr, timeStr) {
+
+    const months = {
+        JAN:0,FEB:1,MAR:2,APR:3,MAY:4,JUN:5,
+        JUL:6,AUG:7,SEP:8,OCT:9,NOV:10,DEC:11
+    };
+
+    const day = parseInt(dateStr.slice(0,2));
+    const mon = months[dateStr.slice(3,6)];
+    const year = 2000 + parseInt(dateStr.slice(7,9));
+
+    const hour = parseInt(timeStr.slice(0,2));
+    const min = parseInt(timeStr.slice(2,4));
+
+    // UTC
+    return new Date(Date.UTC(year, mon, day, hour, min));
+}
+
+function makeFlightDate(dateStr, timeStr) {
+
+    const months = {
+        JAN: 0, FEB: 1, MAR: 2, APR: 3, MAY: 4, JUN: 5,
+        JUL: 6, AUG: 7, SEP: 8, OCT: 9, NOV: 10, DEC: 11
+    };
+
+    // Support both:
+    // 24MAR26
+    // 24-MAR-26
+    const clean = dateStr.replace(/-/g, "").toUpperCase();
+
+    const day = parseInt(clean.slice(0, 2));
+    const month = months[clean.slice(2, 5)];
+    const year = 2000 + parseInt(clean.slice(5, 7));
+
+    const hour = parseInt(timeStr.slice(0, 2));
+    const minute = parseInt(timeStr.slice(2, 4));
+
+    return new Date(Date.UTC(year, month, day, hour, minute));
+}
+
+///NOTAM KEYWORDS
+function matchesGroup(text, group) {
+    return group.some(k => text.includes(k));
+}
+
+///DECLARED VARIABLES OUT OF LOOP
 let dep = "";
 let arr = "";
 let date = "";
@@ -1535,6 +1580,10 @@ let crewOutputPage = null;
 let edtoOutputPage = null;
 let weatherChartsPage = null;
 let weatherChartsOutputPage = null;
+
+let extractedNotams = [];
+let notamDepTime = null;
+let notamArrTime = null;
 
 /* ----------------------------- */
 fileInput.addEventListener("change", async (e) => {
@@ -1729,7 +1778,6 @@ fileInput.addEventListener("change", async (e) => {
 
     // STEP 2: HARD GUARD (ONLY ONCE)
     if (!edtoPage) {
-        console.log("No EDTO section found");
         window.edtoGroups = [];
     } else {
 
@@ -2620,6 +2668,329 @@ if (crewBulletinStartPage !== null) {
     }
 }
 
+/// NOTAM EXTRA TIME THING (FINAL CLEAN VERSION)
+
+const firstPage = await pdf.getPage(1);
+const firstText = await firstPage.getTextContent();
+const page1Text = firstText.items.map(i => i.str).join(" ");
+
+// 1. Extract flight date EARLY (critical fix)
+const dateMatch = page1Text.match(/\d{2}[A-Z]{3}\d{2}/);
+let notamDate = dateMatch ? dateMatch[0] : null;
+
+// 2. Extract scheduled times
+const depMatch = page1Text.match(/SCHED\s+DEP\s+(\d{4})/i);
+const arrMatch = page1Text.match(/SCHED\s+ARR\s+(\d{4})/i);
+
+let notamDepTime = depMatch ? depMatch[1] : null;
+let notamArrTime = arrMatch ? arrMatch[1] : null;
+
+// 3. Safety check
+if (!notamDate || !notamDepTime || !notamArrTime) {
+    console.error("Missing NOTAM base data:", {
+        notamDate,
+        notamDepTime,
+        notamArrTime
+    });
+}
+
+// 4. Build usable Date objects
+const depDateTime = makeFlightDate(notamDate, notamDepTime);
+const arrDateTime = makeFlightDate(notamDate, notamArrTime);
+
+// 5. Handle overnight rollover
+if (arrDateTime < depDateTime) {
+    arrDateTime.setUTCDate(arrDateTime.getUTCDate() + 1);
+}
+
+console.log("NOTAM BASE:", {
+    notamDate,
+    notamDepTime,
+    notamArrTime,
+    depDateTime,
+    arrDateTime
+});
+
+
+/// NOTAM ANALYSIS FEATURE
+
+let airportType = null;
+const ROW_TOLERANCE = 2; // pixels
+
+
+
+if (
+    notamStartPage !== null &&
+    notamEndPage !== null
+) {
+
+    extractedNotams = [];
+
+    let currentNotam = null;
+
+    function finishCurrentNotam() {
+        if (!currentNotam) return;
+
+        for (const row of currentNotam.rows) {
+            row.items.sort((a, b) => a.tx - b.tx);
+            row.text = row.items.map(i => i.text).join(" ");
+        }
+
+        currentNotam.rows.sort((a, b) => b.y - a.y);
+
+        extractedNotams.push(currentNotam);
+    }
+
+    for (let p = notamStartPage; p <= notamEndPage; p++) {
+
+        const page = await pdf.getPage(p);
+        const viewport = page.getViewport({ scale });
+        const textContent = await page.getTextContent();
+
+        const items = textContent.items;
+
+        for (let i = 0; i < items.length; i++) {
+
+            const item = items[i];
+            const token = (item.str || "").trim();
+
+            let next = "";
+
+            for (let j = i + 1; j < items.length; j++) {
+                next = (items[j].str || "").trim();
+                if (next !== "") break;
+            }
+
+            if (token === "DEPARTURE AIRPORT") {
+                airportType = "departure";
+                continue;
+            }
+
+            if (token === "DESTINATION AIRPORT") {
+                airportType = "destination";
+                continue;
+            }
+
+            const isHeader =
+                /^[A-Z0-9]+\/\d+$/.test(token) &&
+                next.startsWith("VALID:");
+
+            if (isHeader) {
+
+                finishCurrentNotam();
+
+                const t = item.transform;
+
+                currentNotam = {
+                    id: token,
+                    airportType,
+                    valid: next,
+                    page: p,
+                    text: token + " " + next,
+                    tx: t[4] * scale,
+                    ty: viewport.height - (t[5] * scale),
+                    width: item.width * scale,
+                    rows: []
+                };
+
+                i++; // Skip VALID line
+                continue;
+            }
+
+            if (currentNotam) {
+
+                currentNotam.text += " " + token;
+
+                const tx = item.transform[4] * scale;
+                const ty = viewport.height - (item.transform[5] * scale);
+
+                const tokenData = {
+                    text: token,
+                    tx,
+                    ty,
+                    width: item.width * scale,
+                    page: p
+                };
+
+                let row = currentNotam.rows.find(
+                    r => Math.abs(r.y - ty) <= ROW_TOLERANCE
+                );
+
+                if (!row) {
+                    row = {
+                        y: ty,
+                        items: []
+                    };
+                    currentNotam.rows.push(row);
+                }
+
+                row.items.push(tokenData);
+            }
+        }
+    }
+
+    finishCurrentNotam();
+}
+
+const GROUP_A = [
+    "RWY",
+    "RUNWAY",
+    "TWY",
+    "TAXIWAY",
+    "ILS",
+    "GP",
+    "LOC",
+    "MINIMA",
+    "TXL"
+];
+
+const GROUP_B = [
+    "CLOSED",
+    "CLSD",
+    "CHANGED",
+    "INCREASED",
+    "REDUCED",
+    "NOT ALLOWED",
+    "NOT AVBL",
+    "U/S",
+    "UNSERVICEABLE",
+    "UNUSABLE"
+];
+
+const NOTAM_BLACKLIST = {
+    // WSSS SINGAPORE
+    "SX65/25": "Known non-critical NOTAM",
+    "SX163/25": "Company policy - do not highlight",
+    "SX120/25": "Long winded NOTAM on permanently unused RWY",
+    "SX56/26": "Irrelevant taxiways",
+    "SX174/24": "Taxiways associated with RWY3"
+
+    // Add more as needed...
+};
+
+for (const notam of extractedNotams) {
+
+    const valid = isNotamValidForFlight(
+        notam.valid,
+        notam.airportType === "departure"
+            ? depDateTime
+            : arrDateTime
+    );
+
+    const hasA = containsKeyword(notam.text, GROUP_A);
+    const hasB = containsKeyword(notam.text, GROUP_B);
+
+    console.log(notam.id, {
+        airport: notam.airportType,
+        validity: notam.valid,
+        valid,
+        hasGroupA: hasA,
+        hasGroupB: hasB
+    });
+}
+
+
+
+function containsKeyword(text, keywords) {
+
+    const upper = text.toUpperCase();
+
+    return keywords.some(keyword => {
+
+        const escaped = keyword
+            .replace(/[.*+?^${}()|[\]\\]/g, "\\$&")
+            .replace(/\s+/g, "\\s+");
+
+        const regex = new RegExp(`\\b${escaped}\\b`, "i");
+
+        return regex.test(upper);
+
+    });
+
+}
+
+function shouldHighlightNotam(notam) {
+
+    if (NOTAM_BLACKLIST[notam.id]) {
+        return false;
+    }
+
+    // ---------- Airport ----------
+    const flightTime =
+        notam.airportType === "departure"
+            ? depDateTime
+            : arrDateTime;
+
+    // validity check comes next
+    if (!isNotamValidForFlight(notam.valid, flightTime)) {
+        return false;
+    }
+
+    // ---------- Keywords ----------
+    const hasGroupA = containsKeyword(notam.text, GROUP_A);
+    const hasGroupB = containsKeyword(notam.text, GROUP_B);
+
+    return hasGroupA && hasGroupB;
+}
+
+function parseNotamValidity(validString) {
+
+    const match = validString.match(
+        /VALID:\s+(\d{2}-[A-Z]{3}-\d{2})\s+(\d{4})\s*-\s*(PERM|UFN|\d{2}-[A-Z]{3}-\d{2}\s+\d{4})/i
+    );
+
+    if (!match) return null;
+
+    const [, startDate, startTime, endPart] = match;
+
+    const start = makeFlightDate(startDate.toUpperCase(), startTime);
+
+    let end;
+
+    if (
+        endPart.toUpperCase() === "PERM" ||
+        endPart.toUpperCase() === "UFN"
+    ) {
+
+        end = new Date("2099-12-31T23:59:00Z");
+
+    } else {
+
+        const [endDate, endTime] = endPart.split(/\s+/);
+
+        end = makeFlightDate(endDate.toUpperCase(), endTime);
+
+    }
+
+    return { start, end };
+}
+
+function isNotamValidForFlight(validString, flightTime) {
+
+    const validity = parseNotamValidity(validString);
+
+    if (!validity) return false;
+
+    const windowStart = new Date(flightTime);
+    const windowEnd = new Date(flightTime);
+
+    windowStart.setUTCHours(windowStart.getUTCHours() - 1);
+    windowEnd.setUTCHours(windowEnd.getUTCHours() + 1);
+
+    return (
+        validity.start <= windowEnd &&
+        validity.end >= windowStart
+    );
+}
+
+
+
+
+
+
+
+
+
 
 
 
@@ -2687,6 +3058,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
         overlay.width = viewport.width;
         overlay.height = viewport.height;
 
+        octx.clearRect(0, 0, overlay.width, overlay.height);
+        octx.globalAlpha = 1;
+
         const textContent = await page.getTextContent();
         const text = textContent.items.map(i => i.str).join(" ");
 
@@ -2717,7 +3091,6 @@ for (let i = 0; i < pagesToRender.length; i++) {
         let contingencyFuel = null;
         let excessFuel = null;
         let reserveFuel = null;
-
 
 
         function calcExcess(rtow, ptow) {
@@ -2796,6 +3169,45 @@ for (let i = 0; i < pagesToRender.length; i++) {
         }
 
         
+        for (const notam of extractedNotams) {
+
+            if (!shouldHighlightNotam(notam))
+                continue;
+
+            for (const row of notam.rows) {
+
+                const rowUpper = row.text.toUpperCase();
+
+                const highlightRow =
+                    containsKeyword(rowUpper, GROUP_A) ||
+                    containsKeyword(rowUpper, GROUP_B);
+
+                if (!highlightRow)
+                    continue;
+
+                for (const item of row.items) {
+
+                    if (item.page !== pageNum)
+                        continue;
+
+                    octx.save();
+
+                    octx.fillStyle = "rgba(255,235,59,0.45)";
+
+                    octx.fillRect(
+                        item.tx - 2,
+                        item.ty - 12,
+                        item.width + 4,
+                        18
+                    );
+
+                    octx.restore();
+                }
+            }
+        }
+
+
+
     
 
 
@@ -2816,9 +3228,6 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             ///SAVE DETAILS
             if (pageNum === 1 && str.includes("SIA")) {
-
-                console.log("Found SIA token:", str);
-
                 const routeMatch = str.match(/([A-Z]{3})\/([A-Z]{3})/);
 
                 if (routeMatch) {
@@ -3006,6 +3415,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     }
                 }
               }
+
+
+              
             ///APD
             if (pageNum === 1) {
               if (upper.includes("APD")) {
@@ -3650,9 +4062,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     );
 
                     octx.restore();
-                }
-            }
+                  }
+              }
 
+
+            
+              
             ///NEXT
 
 
@@ -4149,6 +4564,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
             tocY += 18;
             octx.fillText(`WX CHARTS`, 5, tocY);
         }
+
+
+
+
+
+
 
 
 
