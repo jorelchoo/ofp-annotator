@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v1.3</h2>
+    <h2>OFP Annotation Tool v1.4</h2>
 </div>
 
 <div class="upload">
@@ -3815,19 +3815,17 @@ function analysePressure(period, phase) {
     // -------------------
     // Transition pressure change
     // -------------------
-    const delta = qnh - 1013;
+    const delta = (qnh - 1013) * 27;   // signed altitude difference (ft)
 
     if (delta !== 0) {
-
-        const altitude = Math.abs(delta * 27);
 
         if (phase === "departure") {
 
             alerts.push({
                 severity: "info",
                 text: delta > 0
-                    ? `${altitude} ft gained changing to STD`
-                    : `${altitude} ft lost changing to STD`
+                    ? `${delta} ft lost changing to STD`
+                    : `${-delta} ft gained changing to STD`
             });
 
         } else {
@@ -3835,8 +3833,8 @@ function analysePressure(period, phase) {
             alerts.push({
                 severity: "info",
                 text: delta > 0
-                    ? `${altitude} ft lost changing to QNH`
-                    : `${altitude} ft gained changing to QNH`
+                    ? `${delta} ft gained changing to QNH`
+                    : `${-delta} ft lost changing to QNH`
             });
 
         }
