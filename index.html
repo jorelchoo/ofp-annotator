@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v1.5</h2>
+    <h2>OFP Annotation Tool v1.6</h2>
 </div>
 
 <div class="upload">
@@ -1624,6 +1624,8 @@ let sidOutputPage = null;
 let atcOutputPage = null;
 let wxOutputPage = null;
 let notamOutputPage = null;
+let notamDestPage = null;
+let notamDestOutputPage = null;
 let crewOutputPage = null;
 let edtoOutputPage = null;
 let weatherChartsPage = null;
@@ -1675,7 +1677,13 @@ fileInput.addEventListener("change", async (e) => {
                 if (targetSet.has(token)) {
 
                     const before2 = tokens[i - 2] || null;
-                    const before5 = tokens[i - 4] || null;
+
+                    const before5Token = tokens[i - 4] || null;
+
+                    const before5 =
+                        /^\d{3}(\.\d)?$/.test(before5Token)
+                            ? (tokens[i - 6] || null)
+                            : before5Token;
 
                     results.push({
                         page: p,
@@ -1686,7 +1694,54 @@ fileInput.addEventListener("change", async (e) => {
                 }
             }
         }
+    
+    function summarizeTimeRanges(timeList) {
 
+        const times = timeList
+            .filter(t => /^\d{1,2}\.\d{2}$/.test(t))
+            .map(t => {
+                const [h, m] = t.split(".").map(Number);
+                return h * 60 + m;
+            })
+            .sort((a, b) => a - b);
+
+        if (!times.length) return [];
+
+        const groups = [];
+        let current = [times[0]];
+
+        for (let i = 1; i < times.length; i++) {
+
+            if (times[i] - times[i - 1] <= 45) {
+                current.push(times[i]);
+            } else {
+                groups.push(current);
+                current = [times[i]];
+            }
+        }
+
+        groups.push(current);
+
+        return groups.map(group => {
+
+            let start = Math.floor(group[0] / 5) * 5;
+            let end = Math.ceil(group[group.length - 1] / 5) * 5;
+
+            const format = mins => {
+                const h = Math.floor(mins / 60);
+                const m = mins % 60;
+                return `${h}:${String(m).padStart(2, "0")}`;
+            };
+
+            return `${format(start)} - ${format(end)}`;
+        });
+    }
+    
+    const vwsSummary = summarizeTimeRanges(
+        results.map(r => r.before2)
+    );
+
+    ///HIGH GROUND EXTRACTION
     let codeList = [];
 
     codeList = [];
@@ -1709,16 +1764,36 @@ fileInput.addEventListener("change", async (e) => {
                 item[3] === "*" &&
                 /^\d{3}$/.test(item.slice(0, 3));
 
+            let before17 = wordList[i - 17] || null;
+
+            if (/^\d{3}(\.\d)?$/.test(before17)) {
+                before17 = wordList[i - 18] || null;
+            }
+
             if (valid) {
+
+                const before16 = wordList[i - 16] || null;
+
+                let before17 = wordList[i - 17] || null;
+
+                if (/^\d{3}\.\d$/.test(before17)) {
+                    before17 = wordList[i - 18] || null;
+                }
+
                 codeList.push({
                     code: item.slice(0, 4),
-                    before16: wordList[i - 16] || null,
-                    before17: wordList[i - 17] || null
+                    before16,
+                    before17
                 });
             }
         }
     }
 
+    const highGroundSummary = summarizeTimeRanges(
+        codeList.map(c => c.before16)
+    );
+
+    ///FIND SID AND STAR
     for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
 
         const pg = await pdf.getPage(p);
@@ -1792,7 +1867,10 @@ fileInput.addEventListener("change", async (e) => {
 
             const before5 = tokens[i - 5];
             if (!before5) continue;
-            const waypointBefore = tokens[i - 7];
+            const waypointBefore =
+                /^\d{3}\.\d$/.test(tokens[i - 7] || "")
+                    ? (tokens[i - 9] || null)
+                    : (tokens[i - 7] || null);
 
             matches.push({
                 page: p,
@@ -2155,6 +2233,7 @@ fileInput.addEventListener("change", async (e) => {
         return str
             .replace(/\s+(SA)\b/g, "\n$1")
             .replace(/\s+(FT)\b/g, "\n$1")
+            .replace(/\s+(FC)\b/g, "\n$1")
             .replace(/\s+(TEMPO)\b/g, "\n$1")
             .replace(/\s+(INTER)\b/g, "\n$1")
             .replace(/\s+(PROB\d{0,2})\b/g, "\n$1")
@@ -2547,6 +2626,20 @@ for (let p = 1; p <= pdf.numPages; p++) {
         notamStartPage = p;
     }
 
+    for (const item of tc.items) {
+
+        const token = (item.str || "").trim().toUpperCase();
+
+        if (
+            notamDestPage === null &&
+            token === "DESTINATION AIRPORT"
+        ) {
+            ///console.log("Found on page", p);
+            notamDestPage = p;
+            break;
+        }
+    }
+
     if (
         notamEndPage === null &&
         text.includes("DESTINATION ALTERNATE(S)")
@@ -2561,6 +2654,7 @@ for (let p = 1; p <= pdf.numPages; p++) {
         break;
     }
 }
+
 
 ///INTAM / CREW BULLETIN PAGES
 let crewBulletinStartPage = null;
@@ -2765,6 +2859,7 @@ console.log("NOTAM BASE:", {
 /// NOTAM ANALYSIS FEATURE
 
 let airportType = null;
+let stopNotamExtraction = false;
 const ROW_TOLERANCE = 2; // pixels
 
 
@@ -2786,12 +2881,20 @@ if (
             row.text = row.items.map(i => i.text).join(" ");
         }
 
-        currentNotam.rows.sort((a, b) => b.y - a.y);
+        currentNotam.rows.sort((a, b) => a.y - b.y);
+
+        console.log(
+            currentNotam.id,
+            currentNotam.rows.map(r => ({
+                y: r.y,
+                text: r.text
+            }))
+        );
 
         extractedNotams.push(currentNotam);
     }
 
-    for (let p = notamStartPage; p <= notamEndPage; p++) {
+    for (let p = notamStartPage; p <= notamEndPage && !stopNotamExtraction; p++) {
 
         const page = await pdf.getPage(p);
         const viewport = page.getViewport({ scale });
@@ -2803,6 +2906,12 @@ if (
 
             const item = items[i];
             const token = (item.str || "").trim();
+
+            if (token === "DESTINATION ALTERNATE(S)") {
+                finishCurrentNotam();
+                stopNotamExtraction = true;
+                break;   // Exit the token loop
+            }
 
             let next = "";
 
@@ -2891,12 +3000,14 @@ const GROUP_A = [
     "GP",
     "LOC",
     "MINIMA",
-    "TXL"
+    "TXL",
+    "ACFT STAND"
 ];
 
 const GROUP_B = [
     "CLOSED",
     "CLSD",
+    "CLOSURE",
     "CHANGED",
     "INCREASED",
     "REDUCED",
@@ -2918,6 +3029,10 @@ const NOTAM_BLACKLIST = {
     // Add more as needed...
 };
 
+const NOTAM_BLACKWORDS = [
+    "AMEND"
+];
+
 for (const notam of extractedNotams) {
 
     const valid = isNotamValidForFlight(
@@ -2927,15 +3042,34 @@ for (const notam of extractedNotams) {
             : arrDateTime
     );
 
-    const hasA = containsKeyword(notam.text, GROUP_A);
-    const hasB = containsKeyword(notam.text, GROUP_B);
+    const matchedGroupA = GROUP_A.filter(keyword =>
+        containsKeyword(notam.text, [keyword])
+    );
+
+    const matchedGroupB = GROUP_B.filter(keyword =>
+        containsKeyword(notam.text, [keyword])
+    );
+
+    const hasA = matchedGroupA.length > 0;
+    const hasB = matchedGroupB.length > 0;
+
+    const matchedBlackWords = NOTAM_BLACKWORDS.filter(keyword =>
+        containsKeyword(notam.text, [keyword])
+    );
+
+    const hasBlackWord = matchedBlackWords.length > 0;
 
     console.log(notam.id, {
         airport: notam.airportType,
         validity: notam.valid,
         valid,
         hasGroupA: hasA,
-        hasGroupB: hasB
+        matchedGroupA,
+        hasGroupB: hasB,
+        matchedGroupB,
+        hasBlackWord,
+        matchedBlackWords,
+        text: notam.text
     });
 }
 
@@ -2961,7 +3095,13 @@ function containsKeyword(text, keywords) {
 
 function shouldHighlightNotam(notam) {
 
+    // ---------- NOTAM ID blacklist ----------
     if (NOTAM_BLACKLIST[notam.id]) {
+        return false;
+    }
+
+    // ---------- Keyword blacklist ----------
+    if (containsKeyword(notam.text, NOTAM_BLACKWORDS)) {
         return false;
     }
 
@@ -2971,7 +3111,7 @@ function shouldHighlightNotam(notam) {
             ? depDateTime
             : arrDateTime;
 
-    // validity check comes next
+    // ---------- Validity ----------
     if (!isNotamValidForFlight(notam.valid, flightTime)) {
         return false;
     }
@@ -4429,6 +4569,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
         notamOutputPage = i + 1;
     }
 
+    if (p === notamDestPage && notamDestOutputPage === null) {
+        notamDestOutputPage = i + 1;
+    }
+
     if (p === crewBulletinStartPage && crewOutputPage === null) {
         crewOutputPage = i + 1;
     }
@@ -4584,34 +4728,77 @@ for (let i = 0; i < pagesToRender.length; i++) {
             if (!shouldHighlightNotam(notam))
                 continue;
 
-            for (const row of notam.rows) {
+            for (let r = 0; r < notam.rows.length; r++) {
+
+                const row = notam.rows[r];
+                const nextRow = notam.rows[r + 1];
 
                 const rowUpper = row.text.toUpperCase();
+                const nextUpper = nextRow ? nextRow.text.toUpperCase() : "";
 
-                const highlightRow =
-                    containsKeyword(rowUpper, GROUP_A) ||
-                    containsKeyword(rowUpper, GROUP_B);
+                const rowHasA = containsKeyword(rowUpper, GROUP_A);
+                const rowHasB = containsKeyword(rowUpper, GROUP_B);
 
-                if (!highlightRow)
-                    continue;
+                const nextHasA = nextRow && containsKeyword(nextUpper, GROUP_A);
+                const nextHasB = nextRow && containsKeyword(nextUpper, GROUP_B);
 
-                for (const item of row.items) {
+                let rowsToHighlight = [];
 
-                    if (item.page !== pageNum)
-                        continue;
+                // Rule 1: Current row contains both A and B
+                if (rowHasA && rowHasB) {
 
-                    octx.save();
+                    rowsToHighlight = [row];
 
-                    octx.fillStyle = "rgba(255,235,59,0.45)";
+                }
+                // Rule 2: Current row has A, next row has B
+                else if (rowHasA && nextHasB) {
 
-                    octx.fillRect(
-                        item.tx - 2,
-                        item.ty - 12,
-                        item.width + 4,
-                        18
-                    );
+                    rowsToHighlight = [row, nextRow];
 
-                    octx.restore();
+                    // Skip next row since it has already been highlighted
+                    r++;
+
+                }
+                // Rule 3: Current row has B, next row has A
+                else if (rowHasB && nextHasA) {
+
+                    rowsToHighlight = [row, nextRow];
+
+                    // Skip next row since it has already been highlighted
+                    r++;
+
+                }
+
+                ///console.log(`${notam.id}`, {
+                    ///row1: row.text,
+                    ///row2: nextRow?.text || "(none)",
+                    ///rowHasA,
+                   /// owHasB,
+                    ///nextHasA,
+                    ///nextHasB,
+                    ///highlight: rowsToHighlight.length > 0
+                ///});
+
+                for (const highlightRow of rowsToHighlight) {
+
+                    for (const item of highlightRow.items) {
+
+                        if (item.page !== pageNum)
+                            continue;
+
+                        octx.save();
+
+                        octx.fillStyle = "rgba(255,235,59,0.45)";
+
+                        octx.fillRect(
+                            item.tx - 2,
+                            item.ty - 12,
+                            item.width + 4,
+                            18
+                        );
+
+                        octx.restore();
+                    }
                 }
             }
         }
@@ -4779,27 +4966,27 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             /* ---------------- DEP ---------------- */
             if (pageNum === 1) {
-              if (upper.includes("DEP")) {
+                if (/\bDEP\b/.test(upper)) {
 
-                  const timeMatch = str.match(/\d{4}/);
+                    const timeMatch = str.match(/\d{4}/);
 
-                  if (timeMatch) {
+                    if (timeMatch) {
 
-                      depTime = timeMatch[0];
+                        depTime = timeMatch[0];
 
-                      const tx = item.transform[4] * scale;
-                      const ty = viewport.height - (item.transform[5] * scale);
+                        const tx = item.transform[4] * scale;
+                        const ty = viewport.height - (item.transform[5] * scale);
 
-                      const charWidth = 9;
-                      const startX = tx + (10 * charWidth);
-                      const width = 4 * charWidth;
+                        const charWidth = 9;
+                        const startX = tx + (10 * charWidth);
+                        const width = 4 * charWidth;
 
-                      octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                      octx.fillRect(startX, ty - 10, width, 15);
+                        octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                        octx.fillRect(startX, ty - 10, width, 15);
 
-                      depPos = { tx, ty };
-                  }
-              }
+                        depPos = { tx, ty };
+                    }
+                }
             }
             /* ---------------- ARR ---------------- */
             if (pageNum === 1) {
@@ -5398,7 +5585,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 airportWxStartPage !== null &&
                 airportWxEndPage !== null &&
                 pageNum >= airportWxStartPage &&
-                pageNum <= airportWxEndPage
+                pageNum <= airportWxEndPage &&
+                codeList.length > 0
             ) {
 
                 const token = (item.str || "").trim().toUpperCase();
@@ -5544,6 +5732,31 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 octx.fillText(`FL${m.code} : ${m.value} ${m.waypointBefore}`, 735, y);
                 y += 15;
             }
+
+            ///IFM BRIEFING
+            y += 20;
+            octx.fillText("IFM BFIEF:", 735, y);
+            y += 15
+            octx.fillText("WX:", 735, y);
+
+            y += 15;
+            for (const range of vwsSummary) {
+                octx.fillText(range, 735, y);
+                y += 15;
+            }
+
+            if (highGroundSummary.length > 0) {
+                y += 20;
+                octx.fillText("HG:", 735, y);
+
+                y += 15;
+                for (const range of highGroundSummary) {
+
+                    octx.fillText(range, 735, y);
+
+                    y += 15;
+                }
+            }   
         }
         ///Excess block time
         if (depTime && arrTime && burnoffTime) {
@@ -5639,7 +5852,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
         }
 
         ///HIGH GROUND
-        if (pageNum === 1) {
+        if (pageNum === 1 && codeList?.length) {
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
@@ -5648,7 +5861,6 @@ for (let i = 0; i < pagesToRender.length; i++) {
             let y = 160;
 
             for (const c of codeList) {
-
                 octx.fillText(
                     `${c.before16 || "?"} | ${c.code} | ${c.before17 || "?"}`,
                     620,
@@ -5660,7 +5872,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
         }
 
         ///DECOMP PROFILES
-        if (pageNum === 1) {
+        if (pageNum === 1 && codeList?.length) {
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
@@ -5683,24 +5895,28 @@ for (let i = 0; i < pagesToRender.length; i++) {
             }
         }
         ///EDTO INFO
-        if (pageNum === 1 && edtoGroups.length > 0) {
+        if (pageNum === 1) {
 
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
             let y = 145;
 
-            for (const g of edtoGroups) {
+            if (edtoGroups.length === 0) {
+                octx.fillText("NON EDTO", 5, y);
+            } else {
+                for (const g of edtoGroups) {
 
-                octx.fillText("EDTO:", 5, y);
-                y += 15;
+                    octx.fillText("EDTO:", 5, y);
+                    y += 15;
 
-                octx.fillText(`A1: ${g.airport1 || "-"}`, 5, y); y += 15;
-                octx.fillText(`${g.start || "-"}`, 5, y); y += 15;
-                octx.fillText(`A2: ${g.airport2 || "-"}`, 5, y); y += 15;
-                octx.fillText(`A3: ${g.airport3 || "-"}`, 5, y); y += 15;
-                octx.fillText(`${g.end || "-"}`, 5, y); y += 15;
-                octx.fillText(`A4: ${g.airport4 || "-"}`, 5, y); y += 25;
+                    octx.fillText(`A1: ${g.airport1 || "-"}`, 5, y); y += 15;
+                    octx.fillText(`${g.start || "-"}`, 5, y); y += 15;
+                    octx.fillText(`A2: ${g.airport2 || "-"}`, 5, y); y += 15;
+                    octx.fillText(`A3: ${g.airport3 || "-"}`, 5, y); y += 15;
+                    octx.fillText(`${g.end || "-"}`, 5, y); y += 15;
+                    octx.fillText(`A4: ${g.airport4 || "-"}`, 5, y); y += 25;
+                }
             }
         }
 
@@ -5758,46 +5974,46 @@ for (let i = 0; i < pagesToRender.length; i++) {
             let y = 750;
 
             ///DEP SA + FT
-            octx.fillText("Departure WX:", 530, y);
+            octx.fillText("Departure WX:", 510, y);
             y += 12;
 
             for (const weatherLine of depLines) {
 
-                octx.fillText(weatherLine, 530, y);
+                octx.fillText(weatherLine, 510, y);
                 y += 12;
             }
 
             y += 5;
 
             ///DEP WX ANALYSIS
-            octx.fillText("DEP WX ANALYSIS:", 530, y);
+            octx.fillText(`DEP WX ANALYSIS AT ${notamDepTime}z:`, 510, y);
             y += 12;
 
             depWxLines.forEach((line, i) => {
-                octx.fillText(`${i + 1}. ${line}`, 530, y);
+                octx.fillText(`${i + 1}. ${line}`, 510, y);
                 y += 12;
             });
 
             y += 20;
 
             ///DEST SA + FT
-            octx.fillText("Destination WX:", 530, y);
+            octx.fillText(`DEST WX ANALYSIS AT ${notamArrTime}z:`, 510, y);
             y += 12;
 
             for (const weatherLine of destLines) {
 
-                octx.fillText(weatherLine, 530, y);
+                octx.fillText(weatherLine, 510, y);
                 y += 12;
             }
 
             y += 5;
 
             ///DEST WX ANALYSIS
-            octx.fillText("DEST WX:", 530, y);
+            octx.fillText("DEST WX:", 510, y);
             y += 15;
 
             destWxLines.forEach((line, i) => {
-                octx.fillText(`${i + 1}. ${line}`, 530, y);
+                octx.fillText(`${i + 1}. ${line}`, 510, y);
                 y += 12;
             });
         }
@@ -5809,10 +6025,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
-            octx.fillText("CLB WINDS:", 600, 1050);
+            octx.fillText("CLB WINDS:", 625, 1070);
 
-            let x = 630;
-            let y = 1080;
+            let x = 655;
+            let y = 1100;
 
             for (const w of clbWinds) {
 
@@ -5826,10 +6042,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
-            octx.fillText("DES WINDS:", 600, 1130);
+            octx.fillText("DES WINDS:", 625, 1150);
 
-            x = 630;
-            y = 1160;
+            x = 655;
+            y = 1180;
 
             for (const w of desWinds) {
 
@@ -5848,8 +6064,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillStyle = "blue";
             octx.font = "8px Helvetica";
 
-            let x = 630;
-            const y = 1060;
+            let x = 655;
+            const y = 1080;
 
             for (const fl of fls) {
 
@@ -5868,8 +6084,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillStyle = "blue";
             octx.font = "8px Helvetica";
 
-            let x = 630;
-            const y = 1140;
+            let x = 655;
+            const y = 1160;
 
             for (const fl of fls) {
 
@@ -6013,7 +6229,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillText(`WEATHER`, 5, tocY);
 
             tocY += 18;
-            octx.fillText(`NOTAMS`, 5, tocY);
+            octx.fillText(`DEP NOTAMS`, 5, tocY);
+
+            tocY += 18;
+            octx.fillText(`ARR NOTAMS`, 5, tocY);
 
             tocY += 18;
             octx.fillText(`INTAMS`, 5, tocY);
@@ -6088,6 +6307,12 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
                 });
             }
 
+            if (edtoOutputPage) {
+                pdf.link(5, 1073, 70, 15, {
+                    pageNumber: edtoOutputPage
+                });
+            }
+
             if (atcOutputPage) {
                 pdf.link(5, 1090, 70, 15, {
                     pageNumber: atcOutputPage
@@ -6106,20 +6331,20 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
                 });
             }
 
-            if (crewOutputPage) {
+            if (notamDestOutputPage) {
                 pdf.link(5, 1146, 70, 15, {
+                    pageNumber: notamDestOutputPage
+                });
+            }
+
+            if (crewOutputPage) {
+                pdf.link(5, 1164, 70, 15, {
                     pageNumber: crewOutputPage
                 });
             }
 
-            if (edtoOutputPage) {
-                pdf.link(5, 1073, 70, 15, {
-                    pageNumber: edtoOutputPage
-                });
-            }
-
             if (weatherChartsOutputPage) {
-                pdf.link(5, 1164, 70, 15, {
+                pdf.link(5, 1186, 70, 15, {
                     pageNumber: weatherChartsOutputPage
                 });
             }
