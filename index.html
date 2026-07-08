@@ -1772,12 +1772,27 @@ fileInput.addEventListener("change", async (e) => {
 
             if (valid) {
 
-                const before16 = wordList[i - 16] || null;
+                const nextToken = wordList[i + 1] || null;
 
+                // Ignore climb/descent points
+                if (nextToken === "DSC" || nextToken === "CLB") {
+                    continue;
+                }
+
+                const before16Original = wordList[i - 16] || null;
+
+                let before16 = before16Original;
                 let before17 = wordList[i - 17] || null;
 
-                if (/^\d{3}\.\d$/.test(before17)) {
+                // If before17 is a flight level, use one token further back
+                if (/^\d{3}(\.\d)?$/.test(before17)) {
                     before17 = wordList[i - 18] || null;
+                }
+
+                // If before17 is "...", shift everything forward
+                if (before17 === "...") {
+                    before17 = before16;
+                    before16 = wordList[i - 15] || null;
                 }
 
                 codeList.push({
@@ -2634,7 +2649,6 @@ for (let p = 1; p <= pdf.numPages; p++) {
             notamDestPage === null &&
             token === "DESTINATION AIRPORT"
         ) {
-            ///console.log("Found on page", p);
             notamDestPage = p;
             break;
         }
@@ -4136,6 +4150,16 @@ function buildWeatherLines(...groups) {
     return lines;
 }
 
+function isApplicableWeatherLine(line, applicable) {
+
+    const groups = [
+        applicable.base,
+        ...(applicable.overlays || [])
+    ].filter(Boolean);
+
+    return groups.some(g => line.includes(g.raw));
+}
+
 const depWxLines = buildWeatherLines(
     depVis,
     depWind,
@@ -4216,7 +4240,8 @@ async function extractHighGroundWaypoints(ofpFile){
         "POSN","FREQ","ACTM","ZTM","ATA","AFL","ETA","OAT",
         "ADN","AWIND","TAS","VWS","ZFRQ","AFRM","COORD",
         "MSA","DIS","PFL","RETA","IMT","PDN","FWIND",
-        "GSP","DRM","PFRM","DIFF"
+        "GSP","DRM","PFRM","DIFF","ZFW","TOTAL","DCT",
+        "PRFM", "CFP"
     ]);
 
     for(let k = 0; k < waypoints.length; k++){
@@ -4240,6 +4265,7 @@ async function extractHighGroundWaypoints(ofpFile){
                     const token = words[j].replace(/^-/, "").trim();
 
                     const validLength =
+                        token.length === 2 ||
                         token.length === 3 ||
                         token.length === 5;
 
@@ -4646,6 +4672,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
         let excessFuel = null;
         let reserveFuel = null;
 
+        let planNumber = null;
+
 
         function calcExcess(rtow, ptow) {
             if (rtow == null || ptow == null) return null;
@@ -4842,6 +4870,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///PLAN NUMBER
             if (pageNum === 1) {
                 if (upper.startsWith("PLAN")) {
+                    planNumber = str;
 
                     const t = item.transform;
 
@@ -5979,6 +6008,23 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             for (const weatherLine of depLines) {
 
+                if (isApplicableWeatherLine(weatherLine, depApplicable)) {
+
+                    const x = 510;
+                    const textWidth = octx.measureText(weatherLine).width;
+
+                    octx.fillStyle = "rgba(255,235,59,0.45)";
+                    octx.fillRect(
+                        x - 2,
+                        y - 10,
+                        textWidth + 4,
+                        12
+                    );
+
+                    octx.fillStyle = "blue";
+                    octx.fillText(weatherLine, x, y);
+                }
+
                 octx.fillText(weatherLine, 510, y);
                 y += 12;
             }
@@ -5997,10 +6043,28 @@ for (let i = 0; i < pagesToRender.length; i++) {
             y += 20;
 
             ///DEST SA + FT
-            octx.fillText(`DEST WX ANALYSIS AT ${notamArrTime}z:`, 510, y);
+            octx.fillText("Destination WX:", 510, y);
             y += 12;
 
             for (const weatherLine of destLines) {
+
+                if (isApplicableWeatherLine(weatherLine, destApplicable)) {
+                    
+                    const x = 510;
+                    const textWidth = octx.measureText(weatherLine).width;
+
+                    octx.fillStyle = "rgba(255,235,59,0.45)";
+                    octx.fillStyle = "rgba(255,235,59,0.45)";
+                    octx.fillRect(
+                        x - 2,
+                        y - 10,
+                        textWidth + 4,
+                        12
+                    );
+
+                    octx.fillStyle = "blue";
+                    octx.fillText(weatherLine, x, y);
+                }
 
                 octx.fillText(weatherLine, 510, y);
                 y += 12;
@@ -6009,7 +6073,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             y += 5;
 
             ///DEST WX ANALYSIS
-            octx.fillText("DEST WX:", 510, y);
+            octx.fillText(`DEST WX ANALYSIS AT ${notamArrTime}z:`, 510, y);
             y += 15;
 
             destWxLines.forEach((line, i) => {
@@ -6098,6 +6162,22 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
 
         ///PAGE TITLES
+        ///PLAN NUMBER
+        if (pageNum === 1) {
+
+            octx.save();
+
+            octx.font = "bold 36px Arial";
+            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+
+            octx.fillText(
+                `${planNumber} ${burnoffTime.replace(".", ":")}`,
+                20,
+                50
+            );
+
+            octx.restore();
+        }
         ///ATC FLIGHT PLAN
         if (pageNum === atcFlightPlanPage) {
 
