@@ -2444,7 +2444,8 @@ fileInput.addEventListener("change", async (e) => {
 
     function drawWindArrow(octx, x, y, dirDeg, speed) {
 
-        const angle = (parseInt(dirDeg, 10) * Math.PI) / 180;
+        const windFrom = parseInt(dirDeg, 10);
+        const angle = ((windFrom + 180) % 360) * Math.PI / 180;
 
         const length = 30;
 
