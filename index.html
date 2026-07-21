@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v1.7</h2>
+    <h2>OFP Annotation Tool v1.8</h2>
 </div>
 
 <div class="upload">
@@ -1883,7 +1883,7 @@ fileInput.addEventListener("change", async (e) => {
             const before5 = tokens[i - 5];
             if (!before5) continue;
             const waypointBefore =
-                /^\d{3}\.\d$/.test(tokens[i - 7] || "")
+                /^\d{3}(?:\.\d)?$/.test(tokens[i - 7] || "")
                     ? (tokens[i - 9] || null)
                     : (tokens[i - 7] || null);
 
@@ -4674,6 +4674,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
         let reserveFuel = null;
 
         let planNumber = null;
+        let aircraftRegistration = null;
 
 
         function calcExcess(rtow, ptow) {
@@ -4936,6 +4937,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///REGISTRATION
             if (pageNum === 1) {
                 if (upper.startsWith("9V")) {
+                    aircraftRegistration = str.slice(-3);
 
                     const t = item.transform;
 
@@ -4951,6 +4953,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     octx.fillRect(tx, ty - 12, textWidth, textHeight);
 
                     octx.restore();
+
+
                 }       
             }
             ///Flight Number
@@ -6172,7 +6176,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillStyle = "rgba(255, 0, 0, 0.9)";
 
             octx.fillText(
-                `${planNumber} ${burnoffTime.replace(".", ":")}`,
+                `${planNumber} ${burnoffTime.replace(".", ":")} ${aircraftRegistration}`,
                 20,
                 50
             );
