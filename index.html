@@ -8099,7 +8099,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
         let y =
             (tocAnnotation.canvasHeight - tocAnnotation.y) / scale;
 
-        // Heading
+
         page.drawText("Quick Links:", {
             x,
             y,
@@ -8110,8 +8110,34 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 
         y -= tocAnnotation.lineHeight / scale;
 
-        // Entries
+
         for (const entry of tocAnnotation.entries) {
+
+            const mappedPage = pageMap[entry.page];
+
+            const target =
+                mappedPage !== undefined
+                    ? exportDoc.getPages()[mappedPage]
+                    : undefined;
+
+
+            console.log("TOC LINK DEBUG:", {
+                text: entry.text,
+                originalPage: entry.page,
+                mappedPage,
+                target
+            });
+
+
+            if (!target) {
+                console.warn(
+                    "Skipping missing TOC target:",
+                    entry
+                );
+
+                continue;
+            }
+
 
             page.drawText(entry.text, {
                 x,
@@ -8121,8 +8147,6 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
                 color: PDFLib.rgb(0, 0, 1)
             });
 
-
-            const target = exportDoc.getPages()[pageMap[entry.page]];
 
             addPdfPageLink(
                 exportDoc,
