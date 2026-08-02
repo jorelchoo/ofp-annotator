@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v1.8</h2>
+    <h2>OFP Annotation Tool v2.0</h2>
 </div>
 
 <div class="upload">
@@ -72,7 +72,8 @@ canvas.overlayCanvas {
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
+<script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
 
 <script>
 
@@ -1465,6 +1466,8 @@ const FIR_DATA = [
   }
 ];
 
+///CODE START
+
 window.addEventListener("error", (e) => {
     alert(e.message);
 });
@@ -1615,7 +1618,261 @@ function matchesGroup(text, group) {
     return group.some(k => text.includes(k));
 }
 
+///ANNOTATION DRAW FUNCTION
+function drawPdfText(page, text, x, y) {
+
+    const xOffset = -23;      // move left
+    const yOffset = 0;      // move down (adjust if needed)
+    const fontSize = 8;     // smaller text
+
+    page.drawText(String(text), {
+        x: x + xOffset,
+        y: y + yOffset,
+        size: fontSize,
+        color: PDFLib.rgb(0, 0, 1)
+    });
+
+}
+function drawHighlight(page, transform, text) {
+
+    page.drawRectangle({
+        x: transform[4],
+        y: transform[5]-2,
+        width: text.length * 6,
+        height: 10,
+        color: PDFLib.rgb(1, 0.92, 0.23),
+        opacity: 0.5
+    });
+
+}
+
+function drawOffsetHighlight(page, transform, offsetX, width) {
+
+    const yOffset = -2;
+
+    page.drawRectangle({
+        x: transform[4] + offsetX,
+        y: transform[5] + yOffset,
+        width,
+        height: 10,
+        color: PDFLib.rgb(1, 0.92, 0.23),
+        opacity: 0.5
+    });
+
+}
+
+function drawLegProfileHighlight(page, h) {
+
+    const charWidth = h.itemWidth / h.token.length;
+
+    page.drawRectangle({
+        x: h.transform[4] + (h.startIndex * charWidth),
+        y: h.transform[5] - 2,
+        width: charWidth * 4,
+        height: 10,
+        color: PDFLib.rgb(1, 0, 0),
+        opacity: 0.35
+    });
+
+}
+
+function drawColourHighlight(page, h) {
+
+    let colour;
+
+    if (h.colour.includes("255, 235, 59")) {
+        colour = PDFLib.rgb(1, 0.92, 0.23);
+    } else {
+        colour = PDFLib.rgb(1, 0, 0);
+    }
+
+    page.drawRectangle({
+        x: h.transform[4],
+        y: h.transform[5],
+        width: h.text.length * 6,
+        height: 10,
+        color: colour,
+        opacity: 0.35
+    });
+
+}
+
+function drawWxAirportHighlight(page, h) {
+
+    const charWidth = h.itemWidth / h.token.length;
+
+    page.drawRectangle({
+        x: h.transform[4] + (h.startIndex * charWidth),
+        y: h.transform[5] - 2,
+        width: charWidth * h.text.length,
+        height: 10,
+        color: PDFLib.rgb(1, 0.92, 0.23),
+        opacity: 0.5
+    });
+
+}
+
+function drawPdfWindArrow(page, x, y, dirDeg, speed, font) {
+
+    const windFrom = parseInt(dirDeg, 10);
+    const angle = ((windFrom + 180) % 360) * Math.PI / 180;
+
+    const length = 20;
+
+    const x2 = x + Math.sin(angle) * length;
+    const y2 = y + Math.cos(angle) * length;
+
+    // Shaft
+    page.drawLine({
+        start: {
+            x: x,
+            y: y
+        },
+        end: {
+            x: x2,
+            y: y2
+        },
+        thickness: 1,
+        color: PDFLib.rgb(0, 0, 1)
+    });
+
+    // Arrow head
+    const head = 5;
+    const left = angle - Math.PI / 6;
+    const right = angle + Math.PI / 6;
+
+    page.drawLine({
+        start: {
+            x: x2,
+            y: y2
+        },
+        end: {
+            x: x2 - Math.sin(left) * head,
+            y: y2 - Math.cos(left) * head
+        },
+        thickness: 1,
+        color: PDFLib.rgb(0, 0, 1)
+    });
+
+    page.drawLine({
+        start: {
+            x: x2,
+            y: y2
+        },
+        end: {
+            x: x2 - Math.sin(right) * head,
+            y: y2 - Math.cos(right) * head
+        },
+        thickness: 1,
+        color: PDFLib.rgb(0, 0, 1)
+    });
+
+    // Label
+    page.drawText(
+        `${dirDeg}°/${speed}`,
+        {
+            x: x - 8,
+            y: y - 12,
+            size: 6,
+            font: font,
+            color: PDFLib.rgb(0, 0, 1)
+        }
+    );
+}
+
+function addPdfPageLink(pdfDoc, page, targetPage, x, y, width, height) {
+
+    const context = pdfDoc.context;
+
+    const link = context.obj({
+        Type: PDFLib.PDFName.of("Annot"),
+        Subtype: PDFLib.PDFName.of("Link"),
+
+        Rect: [
+            x,
+            y,
+            x + width,
+            y + height
+        ],
+
+        Border: [0, 0, 0],
+
+        A: context.obj({
+            S: PDFLib.PDFName.of("GoTo"),
+            D: context.obj([
+                targetPage.ref,
+                PDFLib.PDFName.of("Fit")
+            ])
+        })
+    });
+
+    const linkRef = context.register(link);
+
+    let annots = page.node.lookup(
+        PDFLib.PDFName.of("Annots"),
+        PDFLib.PDFArray
+    );
+
+    if (!annots) {
+
+        annots = context.obj([]);
+
+        page.node.set(
+            PDFLib.PDFName.of("Annots"),
+            annots
+        );
+    }
+
+    annots.push(linkRef);
+}
+
 ///DECLARED VARIABLES OUT OF LOOP
+let originalPdfBuffer = null;
+let planHighlight = null;
+let captHighlight = null;
+let aircraftTypeHighlight = null;
+let registrationHighlight = null;
+let flightNumberHighlight = null;
+let depArrHighlight = null;
+let depTimeHighlight = null;
+let arrTimeHighlight = null;
+let apdHighlight = null;
+let burnoffHighlight = null;
+let burnoffAnnotation = null;
+let contingencyAnnotation = null;
+let alternateFuelAnnotation = null;
+let alternateHoldAnnotation = null;
+let taxiFuelAnnotation = null;
+let flightPlanRequirementAnnotation = null;
+let excessFuelAnnotation = null;
+let fuelInTanksAnnotation = null;
+let landingFuelAnnotation = null;
+let pzfwAnnotation = null;
+let ptowAnnotation = null;
+let plwtAnnotation = null;
+let rtowAnnotation = null;
+let excessAnnotation = null;
+let burnAddLessHighlights = [];
+let legsProfileHighlights = [];
+let legsNumberHighlights = [];
+let highGroundWxHighlights = [];
+let destinationNotamAnnotation = null;
+let blockTimeAnnotation = null;
+let vwsAnnotation = null;
+let netTimeAnnotation = null;
+let crewRestAnnotation = null;
+let reservesAnnotation = null;
+let sidStarAnnotation = null;
+let highGroundAnnotation = null;
+let decompProfilesAnnotation = null;
+let edtoAnnotation = null;
+let firAnnotation = null;
+let weatherAnnotation = null;
+let windArrowAnnotation = null;
+let crewBulletinAnnotation = null;
+let pageTitleAnnotations = [];
+let notamHighlights = [];
+
 let dep = "";
 let arr = "";
 let date = "";
@@ -1630,10 +1887,31 @@ let crewOutputPage = null;
 let edtoOutputPage = null;
 let weatherChartsPage = null;
 let weatherChartsOutputPage = null;
+let legsStartPage = null;
+let legsEndPage = null;
+let edtoStartPage = null;
+let edtoEndPage = null;
+let forecastStartPage = null;
+const forecastWindPages = new Set();
+let atcFlightPlanPage = null;
+let wxStartPage = null;
+let wxEndPage = null;
+let notamStartPage = null;
+let notamEndPage = null;
+let crewBulletinStartPage = null;
+let intamTitleAnnotation = null;
+let bulletinAnnotation = null;
+let tocAnnotation = null;
 
 let extractedNotams = [];
 let notamDepTime = null;
 let notamArrTime = null;
+
+let departureWX = "";
+let destinationWX = "";
+
+let depPos = null;
+let arrPos = null;
 
 /* ----------------------------- */
 fileInput.addEventListener("change", async (e) => {
@@ -1642,58 +1920,348 @@ fileInput.addEventListener("change", async (e) => {
     if (!file) return;
 
     viewer.innerHTML = "";
+    
+    burnAddLessHighlights = [];
+    legsProfileHighlights = [];
+    legsNumberHighlights = [];
+    highGroundWxHighlights = [];
+    destinationWX = "";
+    departureWX = "";
+    arrPos = null;
+    pageTitleAnnotations = [];
 
-    const buffer = await file.arrayBuffer();
-    const pdf = await pdfjsLib.getDocument({ data: buffer }).promise;
+    originalPdfBuffer = await file.arrayBuffer();
+
+    const pdf = await pdfjsLib.getDocument({
+        data: originalPdfBuffer.slice(0)
+    }).promise;
+
+    const srcPdf = await PDFLib.PDFDocument.load(
+        originalPdfBuffer.slice(0)
+    );
 
     const scale = 1.5;
+
+
+    ///PREPROCESS PDF (ONE PASS ONLY)
+    const pages = [];
+
+    for (let p = 1; p <= pdf.numPages; p++) {
+
+        const page = await pdf.getPage(p);
+        const textContent = await page.getTextContent();
+        const viewport = page.getViewport({ scale });
+
+        const items = textContent.items;
+        const tokens = items.map(i => (i.str || "").trim());
+        const text = tokens.join(" ");
+        const upperText = text.toUpperCase();
+
+        pages.push({
+            pageNumber: p,
+            page,
+            items,
+            tokens,
+            text,
+            upperText,
+            viewport
+        });
+    }
+
+
+    ///FIND ALL IMPORTANT PAGE LOCATIONS (ONE PASS)
+    let sidPage = null;
+    let starPage = null;
+
+    let edtoPage = null;
+
+    let airportWxStartPage = null;
+    let airportWxEndPage = null;
+
+    let notamDestPage = null;
+    
+    let weatherChartsPage = null;
 
     let sidLine = null;
     let starLine = null;  
 
-    ///VWS extraction
+    for (const pg of pages) {
+
+        const p = pg.pageNumber;
+        const text = pg.text;
+        const upper = pg.upperText;
+        const items = pg.items;
+
+        // SID / STAR pages
+            if (sidPage === null && upper.includes("SID TOTAL DIST:")) {
+                sidPage = p;
+                legsStartPage = p;
+            }
+
+            if (starPage === null && upper.includes("STAR TOTAL DIST:")) {
+                starPage = p;
+                legsEndPage = p;
+            }
+            
+
+            
+        // SID / STAR names
+        if (!sidLine) {
+            const sidRaw = text.match(/SID:\s*([^\n]+)/i)?.[1]?.trim();
+
+            if (sidRaw) {
+                sidLine = sidRaw.split(/\s+/).slice(0, 3).join(" ");
+            }
+        }
+
+        if (!starLine) {
+            const starRaw = text.match(/STAR:\s*([^\n]+)/i)?.[1]?.trim();
+
+            if (starRaw) {
+                starLine = starRaw.split(/\s+/).slice(0, 3).join(" ");
+            }
+        }
+
+        // Airport WX
+        if (wxStartPage === null && upper.includes("AIRPORT WX LIST")) {
+            wxStartPage = p;
+        }
+
+        if (wxEndPage === null && upper.includes("AIRPORTLIST ENDED")) {
+            wxEndPage = p;
+        }
+
+        airportWxStartPage ??= wxStartPage;
+        airportWxEndPage ??= wxEndPage;
+
+        // Forecast Winds
+        if (upper.includes("FORECAST WIND -")) {
+
+            forecastWindPages.add(p);
+
+            if (forecastStartPage === null) {
+                forecastStartPage = p;
+            }
+        }
+
+        // EDTO
+        if (edtoPage === null && upper.includes("EDTO INFORMATION")) {
+            edtoPage = p;
+        }
+
+        if (edtoStartPage === null &&
+            upper.includes("EDTO INFORMATION:")) {
+            edtoStartPage = p;
+        }
+
+        if (edtoEndPage === null &&
+            upper.includes("EDTO ENROUTE ALTN AIRPORTS:")) {
+            edtoEndPage = p;
+        }
+
+        // ATC Flight Plan
+        if (atcFlightPlanPage === null) {
+
+            for (const item of items) {
+
+                if ((item.str || "").trim() === "ATC Flight Plan") {
+                    atcFlightPlanPage = p;
+                    break;
+                }
+            }
+        }
+
+        // NOTAM
+        if (
+            notamStartPage === null &&
+            upper.includes("NOTAM") &&
+            upper.includes("DEPARTURE AIRPORT")
+        ) {
+            notamStartPage = p;
+        }
+
+        if (notamDestPage === null) {
+
+            for (const item of items) {
+
+                if ((item.str || "").trim().toUpperCase() ===
+                    "DESTINATION AIRPORT") {
+
+                    notamDestPage = p;
+                    break;
+                }
+            }
+        }
+
+        if (
+            notamEndPage === null &&
+            upper.includes("DESTINATION ALTERNATE(S)")
+        ) {
+            notamEndPage = p;
+        }
+
+        // Crew Bulletin
+        if (
+            crewBulletinStartPage === null &&
+            upper.includes("INTAM") &&
+            upper.includes("CREW BULLETIN")
+        ) {
+            crewBulletinStartPage = p;
+        }
+
+        // Weather Charts
+        if (
+            weatherChartsPage === null &&
+            upper.includes("SECURITY STATUS")
+        ) {
+            weatherChartsPage = Math.min(p + 1, pdf.numPages);
+        }
+
+    }
+
+
+
+    ///LEGS EXTRACTION (VWS + HIGH GROUND + CLB)
     const targetSet = new Set([
         "004","005","006","007","008","009",
         "010","011","012","013","014","015",
         "016","017","018","019"
-        ]);
+    ]);
 
-        const results = [];
+    const results = [];
+    let codeList = [];
+    const matches = [];
+    let lastCode = null;
 
-        /* -----------------------------
-        SCAN PAGES 5 → 20
-        ----------------------------- */
-        for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+    for (let p = legsStartPage; p <= legsEndPage; p++) {
 
-            const page = await pdf.getPage(p);
-            const textContent = await page.getTextContent();
+        const pg = pages[p - 1];
 
-            const tokens = textContent.items.map(i => i.str);
+        const tokens = pg.tokens;
+        const text = pg.text;
+        const wordList = text.split(/\s+/);
 
-            for (let i = 0; i < tokens.length; i++) {
+        // =====================================================
+        // VWS EXTRACTION
+        // =====================================================
 
-                const token = tokens[i];
+        for (let i = 0; i < tokens.length; i++) {
 
-                if (targetSet.has(token)) {
+            const token = tokens[i];
 
-                    const before2 = tokens[i - 2] || null;
+            if (targetSet.has(token)) {
 
-                    const before5Token = tokens[i - 4] || null;
+                const before2 = tokens[i - 2] || null;
 
-                    const before5 =
-                        /^\d{3}(\.\d)?$/.test(before5Token)
-                            ? (tokens[i - 6] || null)
-                            : before5Token;
+                const before5Token = tokens[i - 4] || null;
 
-                    results.push({
-                        page: p,
-                        before2: before2 ? before2.slice(0, 5) : null,
-                        before5: before5,
-                        match: token
-                    });
-                }
+                const before5 =
+                    /^\d{3}(\.\d)?$/.test(before5Token)
+                        ? (tokens[i - 6] || null)
+                        : before5Token;
+
+                results.push({
+                    page: p,
+                    before2: before2 ? before2.slice(0, 5) : null,
+                    before5: before5,
+                    match: token
+                });
             }
         }
+
+        // =====================================================
+        // HIGH GROUND EXTRACTION
+        // =====================================================
+
+        for (let i = 0; i < wordList.length; i++) {
+
+            const item = wordList[i];
+
+            const valid =
+                item.length === 8 &&
+                item[3] === "*" &&
+                /^\d{3}$/.test(item.slice(0, 3));
+
+            let before17 = wordList[i - 17] || null;
+
+            if (/^\d{3}(\.\d)?$/.test(before17)) {
+                before17 = wordList[i - 18] || null;
+            }
+
+            if (valid) {
+
+                const nextToken = wordList[i + 1] || null;
+
+                // Ignore climb/descent points
+                if (nextToken === "DSC" || nextToken === "CLB") {
+                    continue;
+                }
+
+                const before16Original = wordList[i - 16] || null;
+
+                let before16 = before16Original;
+                before17 = wordList[i - 17] || null;
+
+                // If before17 is a flight level, use one token further back
+                if (/^\d{3}(\.\d)?$/.test(before17)) {
+                    before17 = wordList[i - 18] || null;
+                }
+
+                // If before17 is "...", shift everything forward
+                if (before17 === "...") {
+                    before17 = before16;
+                    before16 = wordList[i - 15] || null;
+                }
+
+                codeList.push({
+                    code: item.slice(0, 4),
+                    before16,
+                    before17
+                });
+            }
+        }
+
+        // =====================================================
+        // CLB SCHEDULE
+        // =====================================================
+
+        for (let i = 0; i < tokens.length; i++) {
+
+            const token = tokens[i];
+
+            const m = token.match(/\b(\d{3})\s*\.\.\./);
+
+            if (!m) continue;
+
+            const code = m[1];
+
+            // filter: first digit must be 2, 3, or 4
+            if (!/^[234]/.test(code)) continue;
+
+            // only record when code changes
+            if (code === lastCode) continue;
+            lastCode = code;
+
+            const before5 = tokens[i - 5];
+            if (!before5) continue;
+
+            const waypointBefore =
+                /^\d{3}(?:\.\d)?$/.test(tokens[i - 7] || "")
+                    ? (tokens[i - 9] || null)
+                    : (tokens[i - 7] || null);
+
+            matches.push({
+                page: p,
+                code,
+                value: before5.slice(0, 5),
+                waypointBefore
+            });
+        }
+    }
+
+    const highGroundSummary = summarizeTimeRanges(
+        codeList.map(c => c.before16)
+    );
     
     function summarizeTimeRanges(timeList) {
 
@@ -1741,109 +2309,14 @@ fileInput.addEventListener("change", async (e) => {
         results.map(r => r.before2)
     );
 
-    ///HIGH GROUND EXTRACTION
-    let codeList = [];
-
-    codeList = [];
-
-    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
-
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-
-        const text = tc.items.map(i => i.str).join(" ");
-
-        const wordList = text.split(/\s+/);
-
-        for (let i = 0; i < wordList.length; i++) {
-
-            const item = wordList[i];
-
-            const valid =
-                item.length === 8 &&
-                item[3] === "*" &&
-                /^\d{3}$/.test(item.slice(0, 3));
-
-            let before17 = wordList[i - 17] || null;
-
-            if (/^\d{3}(\.\d)?$/.test(before17)) {
-                before17 = wordList[i - 18] || null;
-            }
-
-            if (valid) {
-
-                const nextToken = wordList[i + 1] || null;
-
-                // Ignore climb/descent points
-                if (nextToken === "DSC" || nextToken === "CLB") {
-                    continue;
-                }
-
-                const before16Original = wordList[i - 16] || null;
-
-                let before16 = before16Original;
-                let before17 = wordList[i - 17] || null;
-
-                // If before17 is a flight level, use one token further back
-                if (/^\d{3}(\.\d)?$/.test(before17)) {
-                    before17 = wordList[i - 18] || null;
-                }
-
-                // If before17 is "...", shift everything forward
-                if (before17 === "...") {
-                    before17 = before16;
-                    before16 = wordList[i - 15] || null;
-                }
-
-                codeList.push({
-                    code: item.slice(0, 4),
-                    before16,
-                    before17
-                });
-            }
-        }
-    }
-
-    const highGroundSummary = summarizeTimeRanges(
-        codeList.map(c => c.before16)
-    );
-
-    ///FIND SID AND STAR
-    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
-
-        const pg = await pdf.getPage(p);
-        const tc = await pg.getTextContent();
-
-        const text = tc.items.map(i => i.str).join(" ");
-
-        if (!sidLine) {
-            const sidRaw = text.match(/SID:\s*([^\n]+)/i)?.[1]?.trim();
-
-            if (sidRaw) {
-                sidLine = sidRaw.split(/\s+/).slice(0, 3).join(" ");
-            }
-        }
-
-        if (!starLine) {
-            const starRaw = text.match(/STAR:\s*([^\n]+)/i)?.[1]?.trim();
-
-            if (starRaw) {
-                starLine = starRaw.split(/\s+/).slice(0, 3).join(" ");
-            }
-        }
-
-        if (sidLine && starLine) break;
-    }
-
     ///RTOW extraction
     let rtow = null;
 
     for (let p = 2; p <= Math.min(4, pdf.numPages); p++) {
 
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
+        const pg = pages[p - 1];
 
-        const text = tc.items.map(i => i.str).join(" ");
+        const text = pg.text;
 
         const rtowMatch = text.match(/RTOW\s*(?!\()[^\d]*(\d{6})/i);
 
@@ -1852,70 +2325,9 @@ fileInput.addEventListener("change", async (e) => {
             break; // stop once found
         }
     }
-
-    ///CLB SCHEDULE
-    const matches = [];
-    let lastCode = null;
-
-    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
-
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        const tokens = tc.items.map(i => i.str);
-
-        for (let i = 0; i < tokens.length; i++) {
-
-            const token = tokens[i];
-
-            const m = token.match(/\b(\d{3})\s*\.\.\./);
-
-            if (!m) continue;
-
-            const code = m[1];
-
-            // 🔥 filter: first digit must be 2, 3, or 4
-            if (!/^[234]/.test(code)) continue;
-
-            // only record when code changes
-            if (code === lastCode) continue;
-            lastCode = code;
-
-            const before5 = tokens[i - 5];
-            if (!before5) continue;
-            const waypointBefore =
-                /^\d{3}(?:\.\d)?$/.test(tokens[i - 7] || "")
-                    ? (tokens[i - 9] || null)
-                    : (tokens[i - 7] || null);
-
-            matches.push({
-                page: p,
-                code,
-                value: before5.slice(0, 5),
-                waypointBefore
-            });
-        }
-    }
     
     ///EDTO INFORMATION
-    let edtoPage = null;
     let edtoGroups = [];
-
-    // STEP 1: FIND PAGE FIRST (NO RESET INSIDE LOOP)
-    for (let p = 1; p <= pdf.numPages; p++) {
-
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-
-        const text = tc.items
-            .map(i => i.str)
-            .join(" ")
-            .toUpperCase();
-
-        if (text.includes("EDTO INFORMATION")) {
-            edtoPage = p;
-            break;
-        }
-    }
 
     // STEP 2: HARD GUARD (ONLY ONCE)
     if (!edtoPage) {
@@ -1942,9 +2354,12 @@ fileInput.addEventListener("change", async (e) => {
 
         for (let p = startPage; p <= endPage; p++) {
 
-            const page = await pdf.getPage(p);
-            const tc = await page.getTextContent();
-            const tokens = tc.items.map(i => (i.str || "").trim());
+            const pg = pages[p - 1];
+            const page = pg.page;
+            const items = pg.items;
+            const tokens = pg.tokens;
+            const text = pg.text;
+            const upper = pg.upperText;
 
             let lastTime = null;
 
@@ -2048,11 +2463,10 @@ fileInput.addEventListener("change", async (e) => {
         return (t || "").slice(0, 5);
     }
 
-    for (let p = 5; p <= Math.min(20, pdf.numPages); p++) {
+    for (let p = legsStartPage; p <= legsEndPage; p++) {
 
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        const tokens = tc.items.map(i => (i.str || "").trim());
+        const pg = pages[p - 1];
+        const tokens = pg.tokens;
 
         for (let i = 0; i < tokens.length; i++) {
 
@@ -2208,38 +2622,8 @@ fileInput.addEventListener("change", async (e) => {
         }
     }
 
-    /* =========================================================
-    AIRPORT WX LIST EXTRACTION
-    ========================================================= */
 
-    let wxStartPage = null;
-    let wxEndPage = null;
-
-    /* -----------------------------
-    FIND START / END PAGES
-    ------------------------------ */
-    for (let p = 1; p <= pdf.numPages; p++) {
-
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        const text = tc.items.map(i => i.str).join(" ");
-
-        if (text.includes("Airport WX List") && wxStartPage === null) {
-            wxStartPage = p;
-        }
-
-        if (text.includes("AIRPORTLIST ENDED")) {
-            wxEndPage = p;
-            break;
-        }
-    }
-
-    /* -----------------------------
-    STORAGE
-    ------------------------------ */
-    let destinationWX = "";
-    let departureWX = "";
-
+    ///AIRPORT WX LIST EXTRACTION
     /* -----------------------------
     WEATHER BREAK FORMATTER
     ------------------------------ */
@@ -2261,9 +2645,12 @@ fileInput.addEventListener("change", async (e) => {
     ========================================================= */
     for (let p = wxStartPage; p <= wxEndPage; p++) {
 
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-        const tokens = tc.items.map(i => i.str);
+        const pg = pages[p - 1];
+        const page = pg.page;
+        const items = pg.items;
+        const tokens = pg.tokens;
+        const text = pg.text;
+        const upper = pg.upperText;
 
         for (let i = 0; i < tokens.length; i++) {
 
@@ -2376,24 +2763,8 @@ fileInput.addEventListener("change", async (e) => {
 
     ///FORECAST WINDS
     /// FORECAST WIND EXTRACTION + ARROWS
-    let forecastStartPage = null;
-
     let clbWinds = [];
     let desWinds = [];
-
-    // 1. FIND START PAGE
-    for (let p = 1; p <= pdf.numPages; p++) {
-
-        const page = await pdf.getPage(p);
-        const tc = await page.getTextContent();
-
-        const text = tc.items.map(i => i.str).join(" ").toUpperCase();
-
-        if (text.includes("FORECAST WIND -")) {
-            forecastStartPage = p;
-            break;
-        }
-    }
 
     if (forecastStartPage) {
 
@@ -2401,9 +2772,12 @@ fileInput.addEventListener("change", async (e) => {
 
         for (let p = forecastStartPage; p <= endPage; p++) {
 
-            const page = await pdf.getPage(p);
-            const tc = await page.getTextContent();
-            const tokens = tc.items.map(i => (i.str || "").trim());
+            const pg = pages[p - 1];
+            const page = pg.page;
+            const items = pg.items;
+            const tokens = pg.tokens;
+            const text = pg.text;
+            const upper = pg.upperText;
 
             for (let i = 0; i < tokens.length; i++) {
 
@@ -2487,224 +2861,74 @@ fileInput.addEventListener("change", async (e) => {
     }
 
 
-    
-/// FIND LEGS PAGES
-let sidPage = null;
-let starPage = null;
-
-for (let p = 1; p <= pdf.numPages; p++) {
-
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-
-    const text = tc.items
-        .map(i => i.str)
-        .join(" ")
-        .toUpperCase();
-
-    if (sidPage === null && text.includes("SID TOTAL DIST:")) {
-        sidPage = p;
-    }
-
-    if (starPage === null && text.includes("STAR TOTAL DIST:")) {
-        starPage = p;
-    }
-
-    if (sidPage && starPage) break;
-}
-
-///FIND EDTO INFORMATION PAGES
-let edtoStartPage = null;
-let edtoEndPage = null;
-
-for (let p = 1; p <= pdf.numPages; p++) {
-
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-
-    const text = tc.items
-        .map(i => i.str)
-        .join(" ")
-        .toUpperCase();
-
-    if (
-        edtoStartPage === null &&
-        text.includes("EDTO INFORMATION:")
-    ) {
-        edtoStartPage = p;
-    }
-
-    if (
-        edtoEndPage === null &&
-        text.includes("EDTO ENROUTE ALTN AIRPORTS:")
-    ) {
-        edtoEndPage = p;
-    }
-
-    if (edtoStartPage && edtoEndPage) break;
-}
-
-///FIND WIND FORECAST PAGES
-const forecastWindPages = new Set();
-
-for (let p = 1; p <= pdf.numPages; p++) {
-
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-
-    const text = tc.items
-        .map(i => i.str)
-        .join(" ")
-        .toUpperCase();
-
-    if (text.includes("FORECAST WIND -")) {
-        forecastWindPages.add(p);
-    }
-}
-
-///ATC Flight Plan
-let atcFlightPlanPage = null;
-
-for (let p = 1; p <= pdf.numPages; p++) {
-
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-
-    for (const item of tc.items) {
-
-        const token = (item.str || "").trim();
-
-        if (token === "ATC Flight Plan") {
-            atcFlightPlanPage = p;
-            break;
-        }
-    }
-
-    if (atcFlightPlanPage !== null) break;
-}
-
-///AIRPORT WEATHER PAGES
-let airportWxStartPage = null;
-let airportWxEndPage = null;
-
-for (let p = 1; p <= pdf.numPages; p++) {
-
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-
-    const text = tc.items
-        .map(i => i.str)
-        .join(" ")
-        .toUpperCase();
-
-    if (
-        airportWxStartPage === null &&
-        text.includes("AIRPORT WX LIST")
-    ) {
-        airportWxStartPage = p;
-    }
-
-    if (
-        airportWxEndPage === null &&
-        text.includes("AIRPORTLIST ENDED")
-    ) {
-        airportWxEndPage = p;
-    }
-
-    if (
-        airportWxStartPage !== null &&
-        airportWxEndPage !== null
-    ) {
-        break;
-    }
-}
-
-///NOTAMS for DEP/ARR
-///NOTAM PAGES
-let notamStartPage = null;
-let notamEndPage = null;
-
-for (let p = 1; p <= pdf.numPages; p++) {
-
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-
-    const text = tc.items
-        .map(i => i.str)
-        .join(" ")
-        .toUpperCase();
-
-    if (
-        notamStartPage === null &&
-        text.includes("NOTAM") &&
-        text.includes("DEPARTURE AIRPORT")
-    ) {
-        notamStartPage = p;
-    }
-
-    for (const item of tc.items) {
-
-        const token = (item.str || "").trim().toUpperCase();
-
-        if (
-            notamDestPage === null &&
-            token === "DESTINATION AIRPORT"
-        ) {
-            notamDestPage = p;
-            break;
-        }
-    }
-
-    if (
-        notamEndPage === null &&
-        text.includes("DESTINATION ALTERNATE(S)")
-    ) {
-        notamEndPage = p;
-    }
-
-    if (
-        notamStartPage !== null &&
-        notamEndPage !== null
-    ) {
-        break;
-    }
-}
-
-
 ///INTAM / CREW BULLETIN PAGES
-let crewBulletinStartPage = null;
 
-for (let p = 1; p <= pdf.numPages; p++) {
+function parseIntamDate(str) {
 
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
+    let year, month, day;
 
-    const text = tc.items
-        .map(i => i.str)
-        .join(" ")
-        .toUpperCase();
-
-    if (
-        text.includes("INTAM") &&
-        text.includes("CREW BULLETIN")
-    ) {
-        crewBulletinStartPage = p;
-        break;
+    if (str.length === 8) {
+        year = Number(str.substring(0, 4));
+        month = Number(str.substring(4, 6));
+        day = Number(str.substring(6, 8));
+    } else {
+        year = 2000 + Number(str.substring(0, 2));
+        month = Number(str.substring(2, 4));
+        day = Number(str.substring(4, 6));
     }
+
+    return new Date(year, month - 1, day);
+}
+
+function isRecentIntam(date) {
+
+    const today = new Date();
+
+    today.setHours(0,0,0,0);
+    date.setHours(0,0,0,0);
+
+    const diff = (today - date) / (1000 * 60 * 60 * 24);
+
+    return diff >= 0 && diff <= 7;
 }
 
 const bulletinAnnotations = [];
+const recentIntamDates = [];
 
 for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
-    const page = await pdf.getPage(p);
-    const textContent = await page.getTextContent();
-    const items = textContent.items;
+    const pg = pages[p - 1];
+    const page = pg.page;
+    const items = pg.items;
+    const tokens = pg.tokens;
+    const text = pg.text;
+    const upper = pg.upperText;
 
     for (let i = 1; i < items.length - 1; i++) {
 
         const prev = items[i - 1].str;
         const current = items[i].str;
         const next = items[i + 1].str;
+
+        const token = current.trim();
+
+        const match =
+            token.match(/\b\d{8}\b/) ||
+            token.match(/\b\d{6}\b/);
+
+        if (match) {
+
+            const date = parseIntamDate(match[0]);
+
+            if (isRecentIntam(date)) {
+
+                recentIntamDates.push({
+                    page: p,
+                    item: items[i],
+                    date: match[0]
+                });
+
+            }
+        }
 
         const prevHasEquals = prev.includes("=");
         const isOneDot = current.includes("1.");
@@ -2713,27 +2937,6 @@ for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
             const cleanCurrent = current.replace("1.", "").trim();
             bulletinAnnotations.push(`${cleanCurrent} - ${next.trim()}`);
         }
-    }
-}
-
-///WX CHARTS Page
-/* -----------------------------
-   WEATHER CHARTS PAGE
------------------------------ */
-for (let p = 1; p <= pdf.numPages; p++) {
-
-    const page = await pdf.getPage(p);
-    const textContent = await page.getTextContent();
-
-    const text = textContent.items
-        .map(i => i.str)
-        .join(" ")
-        .toUpperCase();
-
-    if (text.includes("SECURITY STATUS")) {
-
-        weatherChartsPage = Math.min(p + 1, pdf.numPages);
-        break;
     }
 }
 
@@ -2829,9 +3032,7 @@ if (crewBulletinStartPage !== null) {
 
 /// NOTAM EXTRA TIME THING (FINAL CLEAN VERSION)
 
-const firstPage = await pdf.getPage(1);
-const firstText = await firstPage.getTextContent();
-const page1Text = firstText.items.map(i => i.str).join(" ");
+const page1Text = pages[0].text;
 
 // 1. Extract flight date EARLY (critical fix)
 const dateMatch = page1Text.match(/\d{2}[A-Z]{3}\d{2}/);
@@ -2911,11 +3112,10 @@ if (
 
     for (let p = notamStartPage; p <= notamEndPage && !stopNotamExtraction; p++) {
 
-        const page = await pdf.getPage(p);
-        const viewport = page.getViewport({ scale });
-        const textContent = await page.getTextContent();
+        const pg = pages[p - 1];
 
-        const items = textContent.items;
+        const viewport = pg.page.getViewport({ scale });
+        const items = pg.items;
 
         for (let i = 0; i < items.length; i++) {
 
@@ -3509,6 +3709,9 @@ function analyseVisibility(applicable) {
 
     const alerts = [];
 
+    if (!applicable)
+        return alerts;
+
     const all = [
         ...(applicable.base ? [applicable.base] : []),
         ...(applicable.overlays || [])
@@ -3567,10 +3770,11 @@ function analyseVisibility(applicable) {
     return alerts;
 }
 
-
-
 ///CLOUD BASE ANALYSIS
 function getCloudBase(period) {
+
+    if (!period)
+        return null;
 
     if (!period.clouds || period.clouds.length === 0)
         return null;
@@ -3624,15 +3828,12 @@ function getCloudBase(period) {
 }
 
 ///RWY EXTRACTION
-///RUNWAY EXTRACTION
-async function extractRunways(pdf) {
+function extractRunways(pages) {
 
-    const page = await pdf.getPage(1);
-    const textContent = await page.getTextContent();
-
+    const items = pages[0].items;
     const runways = [];
 
-    for (const item of textContent.items) {
+    for (const item of items) {
 
         const match = item.str.match(/[A-Z]{4}\/(\d{2}[LRC]?)/);
 
@@ -3647,7 +3848,7 @@ async function extractRunways(pdf) {
     };
 }
 
-const runways = await extractRunways(pdf);
+const runways = extractRunways(pages);
 
 const departureRunway = runways.departure;
 const arrivalRunway = runways.arrival;
@@ -3669,8 +3870,6 @@ function runwayHeading(runway) {
 
     return number * 10;
 }
-
-
 
 ///WINDS
 function parseWind(windString, other = []) {
@@ -4077,37 +4276,83 @@ const destApplicable = resolveDestinationWeather(destinationForecast, arrDateTim
 const depVis = analyseVisibility(depApplicable);
 const destVis = analyseVisibility(destApplicable);
 
-const depCloud = getCloudBase(depApplicable.base);
-const destCloud = getCloudBase(destApplicable.base);
+console.log("DEST APPLICABLE", destApplicable);
 
-const depWind = analyseWind(
-    depApplicable.base,
-    runwayHeading(departureRunway)
-);
+const destCloud = destApplicable
+    ? getCloudBase(destApplicable.base)
+    : null;
 
-const destWind = analyseWind(
-    destApplicable.base,
-    runwayHeading(arrivalRunway)
-);
+const depCloud = depApplicable
+    ? getCloudBase(depApplicable.base)
+    : null;
 
-const depTemp = analyseTemperature(depApplicable.base);
-const destTemp = analyseTemperature(destApplicable.base);
 
-const depPressure = analysePressure(
-    depApplicable.base,
-    "departure"
-);
+// ---------------- DEPARTURE ANALYSIS ----------------
 
-const destPressure = analysePressure(
-    destSA,
-    "arrival"
-);
+let depWind = [];
+let depTemp = null;
+let depPressure = null;
+let depTS = [];
+let depHazards = [];
 
-const depTS = analyseThunderstorms(depApplicable.base);
-const destTS = analyseThunderstorms(destApplicable.base);
+if (depApplicable) {
 
-const depHazards = analyseWeatherHazards(depApplicable.base);
-const destHazards = analyseWeatherHazards(destApplicable.base);
+    depWind = analyseWind(
+        depApplicable.base,
+        runwayHeading(departureRunway)
+    );
+
+    depTemp = analyseTemperature(
+        depApplicable.base
+    );
+
+    depPressure = analysePressure(
+        depApplicable.base,
+        "departure"
+    );
+
+    depTS = analyseThunderstorms(
+        depApplicable.base
+    );
+
+    depHazards = analyseWeatherHazards(
+        depApplicable.base
+    );
+}
+
+
+// ---------------- DESTINATION ANALYSIS ----------------
+
+let destWind = [];
+let destTemp = null;
+let destPressure = null;
+let destTS = [];
+let destHazards = [];
+
+if (destApplicable) {
+
+    destWind = analyseWind(
+        destApplicable.base,
+        runwayHeading(arrivalRunway)
+    );
+
+    destTemp = analyseTemperature(
+        destApplicable.base
+    );
+
+    destPressure = analysePressure(
+        destSA,
+        "arrival"
+    );
+
+    destTS = analyseThunderstorms(
+        destApplicable.base
+    );
+
+    destHazards = analyseWeatherHazards(
+        destApplicable.base
+    );
+}
 
 function buildWeatherLines(...groups) {
 
@@ -4200,13 +4445,11 @@ async function extractHighGroundWaypoints(ofpFile){
     // PASS 1 - Extract all high ground waypoints
     //--------------------------------------------------
 
-    for(let p = 5; p <= Math.min(20, pdf.numPages); p++){
+    for (let p = legsStartPage; p <= legsEndPage; p++) {
 
-        const page = await pdf.getPage(p);
-        const textContent = await page.getTextContent();
+        const pg = pages[p - 1];
 
-        const text = textContent.items.map(i => i.str).join(" ");
-        const words = text.split(/\s+/);
+        const words = pg.text.split(/\s+/);
 
         pageWords.push(words);
 
@@ -4381,15 +4624,11 @@ async function findDecompressionProfiles(highGroundWaypoints){
     let waitingForProfile = false;
     let currentRoute = "";
 
-    for(let p = START_PAGE; p <= END_PAGE; p++){
+    for (let p = START_PAGE; p <= END_PAGE; p++) {
 
-        const page = await pdf.getPage(p);
+        const pg = pages[p - 1];
 
-        const textContent = await page.getTextContent();
-
-        const tokens = textContent.items
-            .map(i => i.str.trim())
-            .filter(Boolean);
+        const tokens = pg.tokens.filter(Boolean);
 
         for(const token of tokens){
 
@@ -4460,15 +4699,11 @@ async function findDecompressionProfiles(highGroundWaypoints){
     // FALLBACK PROFILE MATCH
     //--------------------------------------------------
 
-    for(let p = START_PAGE; p <= END_PAGE; p++){
+    for (let p = START_PAGE; p <= END_PAGE; p++) {
 
-        const page = await pdf.getPage(p);
+        const pg = pages[p - 1];
 
-        const textContent = await page.getTextContent();
-
-        const tokens = textContent.items
-            .map(i => i.str.trim())
-            .filter(Boolean);
+        const tokens = pg.tokens.filter(Boolean);
 
         let lastRoute = null;
 
@@ -4560,13 +4795,11 @@ async function findDecompressionProfiles(highGroundWaypoints){
 
 }
 
-
-
 const highGroundWaypoints = await extractHighGroundWaypoints(fileInput.files[0]);
-
 const profiles = await findDecompressionProfiles(highGroundWaypoints);
-
 console.log(profiles);
+
+
 
 
 
@@ -4612,8 +4845,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
     for (const pageNum of pagesToRender) {
 
-        const page = await pdf.getPage(pageNum);
-        const viewport = page.getViewport({ scale });
+        const pg = pages[pageNum - 1];
+        const page = pg.page;
+        const viewport = pg.viewport;
+        const items = pg.items;
 
         const wrapper = document.createElement("div");
         wrapper.className = "pageWrapper";
@@ -4642,8 +4877,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
         octx.clearRect(0, 0, overlay.width, overlay.height);
         octx.globalAlpha = 1;
 
-        const textContent = await page.getTextContent();
-        const text = textContent.items.map(i => i.str).join(" ");
+        const text = pg.text;
 
 
         ///DECLARED VARIABLES
@@ -4651,8 +4885,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
         let depTime = null;
         let arrTime = null;
 
-        let depPos = null;
-        let arrPos = null;
+        
 
         let burnTime = null;
         let burnoffTime = null;
@@ -4818,6 +5051,14 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                         octx.save();
 
+                        notamHighlights.push({
+                            page: item.page - 1,
+                            x: item.tx,
+                            y: item.ty,
+                            width: item.width,
+                            height: 18,
+                        });
+
                         octx.fillStyle = "rgba(255,235,59,0.45)";
 
                         octx.fillRect(
@@ -4833,7 +5074,32 @@ for (let i = 0; i < pagesToRender.length; i++) {
             }
         }
 
+        if (recentIntamDates.length) {
 
+            for (const intam of recentIntamDates) {
+
+                if (intam.page !== pageNum)
+                    continue;
+
+                const t = intam.item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                octx.save();
+
+                octx.fillStyle = "rgba(255,165,0,0.45)";
+
+                octx.fillRect(
+                    tx,
+                    ty - 12,
+                    intam.item.width * scale,
+                    18
+                );
+
+                octx.restore();
+            }
+        }
 
     
 
@@ -4841,9 +5107,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
         /* -----------------------------
         LOOP TEXT
         ----------------------------- */
-        for (let i = 0; i < textContent.items.length; i++) {
+        for (let i = 0; i < items.length; i++) {
 
-            const item = textContent.items[i];
+            const item = items[i];
             const str = (item.str || "");
             const upper = str.toUpperCase();
 
@@ -4887,9 +5153,24 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     octx.fillStyle = "rgba(255, 235, 59, 0.5)";
                     octx.fillRect(tx, ty - 12, textWidth, textHeight);
 
+                    planHighlight = {
+                        page: 0,
+                        transform: t,
+                        text: str,
+
+                        x: tx,
+                        y: ty - 12,
+
+                        width: textWidth,
+                        height: textHeight
+                    };
+
+                    console.log(item.transform);
+
                     octx.restore();
                 }
             }
+
             ///AIRCRAFT TYPE + CAPTAIN
             if (pageNum === 1 && afterRteNo && !captFound) {
 
@@ -4907,6 +5188,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     // -------------------------
                     // highlight CAPT
                     // -------------------------
+                    captHighlight = {
+                        page: 0,
+                        transform: t,
+                        text: str
+                    };
+
                     octx.save();
                     octx.fillStyle = "rgba(255, 235, 59, 0.5)";
                     octx.fillRect(tx, ty - 12, textWidth, textHeight);
@@ -4915,10 +5202,16 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     // -------------------------
                     // highlight aircraft type (previous token)
                     // -------------------------
-                    const prev = textContent.items[i - 2];
+                    const prev = items[i - 2];
 
                     if (prev && prev.str) {
                         const pt = prev.transform;
+
+                        aircraftTypeHighlight = {
+                            page: 0,
+                            transform: pt,
+                            text: prev.str
+                        };
 
                         const ptx = pt[4] * scale;
                         const pty = viewport.height - (pt[5] * scale);
@@ -4932,14 +5225,18 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     }
                 }
             }
-
-
             ///REGISTRATION
             if (pageNum === 1) {
                 if (upper.startsWith("9V")) {
                     aircraftRegistration = str.slice(-3);
 
                     const t = item.transform;
+
+                    registrationHighlight = {
+                        page: 0,
+                        transform: t,
+                        text: str
+                    };
 
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
@@ -4953,8 +5250,6 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     octx.fillRect(tx, ty - 12, textWidth, textHeight);
 
                     octx.restore();
-
-
                 }       
             }
             ///Flight Number
@@ -4962,6 +5257,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 if (upper.startsWith("SIA") && str.length < 9) {
 
                     const t = item.transform;
+
+                    flightNumberHighlight = {
+                        page: 0,
+                        transform: t,
+                        text: str
+                    };
 
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
@@ -4982,6 +5283,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 if (/^[A-Z]{3}\/[A-Z]{3}$/.test(upper)) {
 
                     const t = item.transform;
+
+                    depArrHighlight = {
+                        page: 0,
+                        transform: t,
+                        text: str
+                    };
 
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
@@ -5008,6 +5315,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                         depTime = timeMatch[0];
 
+                        const t = item.transform;
+
+                        depTimeHighlight = {
+                            page: 0,
+                            transform: t
+                        };
+
                         const tx = item.transform[4] * scale;
                         const ty = viewport.height - (item.transform[5] * scale);
 
@@ -5032,6 +5346,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                         arrTime = timeMatch[0];
 
+                        const t = item.transform;
+
+                        arrTimeHighlight = {
+                            page: 0,
+                            transform: t
+                        };
+
                         const tx = item.transform[4] * scale;
                         const ty = viewport.height - (item.transform[5] * scale);
 
@@ -5045,92 +5366,108 @@ for (let i = 0; i < pagesToRender.length; i++) {
                         arrPos = { tx, ty };
                     }
                 }
-              }
-
-
-              
+            }
             ///APD
             if (pageNum === 1) {
-              if (upper.includes("APD")) {
+                if (upper.includes("APD")) {
 
-                  const target = str;
+                    const target = str;
 
-                  if (!target) continue;
+                    if (!target) continue;
 
-                  const last3 = target.slice(-3);
+                    const last3 = target.slice(-3);
 
-                  const t = item.transform;
+                    const t = item.transform;
 
-                  const tx = t[4] * scale;
-                  const ty = viewport.height - (t[5] * scale);
+                    apdHighlight = {
+                        page: 0,
+                        transform: t,
+                        text: target
+                    };
 
-                  const textWidth = last3.length * 9;
-                  const textHeight = 18;
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
 
-                  octx.save();
+                    const textWidth = last3.length * 9;
+                    const textHeight = 18;
 
-                  octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                  octx.fillRect(tx + (target.length - 3) * 9, ty - 12, textWidth, textHeight);
+                    octx.save();
 
-                  octx.restore();
-              }
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx + (target.length - 3) * 9, ty - 12, textWidth, textHeight);
+
+                    octx.restore();
+                }
             }
             /// Flight time highlight
             if (pageNum === 1) {
-              if (upper.includes("BURNOFF")) {
+                if (upper.includes("BURNOFF")) {
 
-                  const valueItem = textContent.items[i + 2];
+                    const valueItem = items[i + 2];
 
-                  if (!valueItem || !valueItem.str) continue;
+                    if (!valueItem || !valueItem.str) continue;
 
-                  const burnTime = valueItem.str;
+                    const burnTime = valueItem.str;
 
-                  // must be 12.34 format
-                  if (!/^\d{2}\.\d{2}$/.test(burnTime)) continue;
+                    // must be 12.34 format
+                    if (!/^\d{2}\.\d{2}$/.test(burnTime)) continue;
 
-                  // safe fallback if transform missing
-                  const t = valueItem.transform || item.transform;
+                    // safe fallback if transform missing
+                    const t = valueItem.transform || item.transform;
+                    
+                    burnoffHighlight = {
+                        page: 0,
+                        transform: t,
+                        text: burnTime
+                    };
 
-                  const tx = t[4] * scale;
-                  const ty = viewport.height - (t[5] * scale);
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
 
-                  const charWidth = 9;
-                  const width = burnTime.length * charWidth;
+                    const charWidth = 9;
+                    const width = burnTime.length * charWidth;
 
-                  octx.fillStyle = "rgba(255, 235, 59, 0.5)";
-                  octx.fillRect(tx, ty - 10, width, 15);
+                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                    octx.fillRect(tx, ty - 10, width, 15);
 
-                  burnoffTime = burnTime;
-              }
+                    burnoffTime = burnTime;
+                }
             }
-            ///Burn-off
-            if (upper.includes("BURNOFF")) {
+        ///Burn-off
+        if (upper.includes("BURNOFF")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+            const valueItem = items[i + 4]; // 4 tokens after
 
-                if (!valueItem || !valueItem.str) continue;
+            if (!valueItem || !valueItem.str) continue;
 
-                const converted = convertFuel(valueItem.str);
+            const converted = convertFuel(valueItem.str);
 
-                if (converted === null) continue;
+            if (converted === null) continue;
 
-                const t = valueItem.transform || item.transform;
+            const t = valueItem.transform || item.transform;
 
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
+            burnoffAnnotation = {
+                page: pageNum - 1,
+                text: converted,
+                x: t[4] + 65,
+                y: t[5]
+            };
 
-                const charWidth = 9;
-                const width = (String(converted).length + 2) * charWidth;
+            const tx = t[4] * scale;
+            const ty = viewport.height - (t[5] * scale);
 
-                octx.fillStyle = "blue";
-                octx.font = "12px Helvetica";
-                octx.fillText(converted, tx + 65, ty);
-            }
+            octx.fillStyle = "blue";
+            octx.font = "12px Helvetica";
 
+            octx.fillText(
+                converted,
+                tx + 65,
+                ty
+            );
+        }
             ///Contingency
-            if (upper.includes("CONT")) {
-
-                const valueItem = textContent.items[i + 4];
+            if (pageNum === 1 && upper.includes("CONT")) {
+                const valueItem = items[i + 4];
 
                 if (valueItem && valueItem.str) {
                     const converted = convertFuel(valueItem.str);
@@ -5140,6 +5477,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
                         contingencyFuel = converted;
 
                         const t = valueItem.transform || item.transform;
+                        contingencyAnnotation = {
+                            page: 0,
+                            text: converted,
+                            x: t[4] + 65,
+                            y: t[5]
+                        };
                         const tx = t[4] * scale;
                         const ty = viewport.height - (t[5] * scale);
 
@@ -5149,11 +5492,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     }
                 }
             }
-
             ///ALTN FUEL
             if (upper.includes("ALTN FUEL")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+                const valueItem = items[i + 4]; // 4 tokens after
 
                 if (!valueItem || !valueItem.str) continue;
 
@@ -5162,6 +5504,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 if (converted === null) continue;
 
                 const t = valueItem.transform || item.transform;
+
+                alternateFuelAnnotation = {
+                    page: 0,
+                    text: converted,
+                    x: t[4] + 65,
+                    y: t[5]
+                };
 
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
@@ -5173,11 +5522,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 octx.font = "12px Helvetica";
                 octx.fillText(converted, tx + 65, ty);
             }
-
             ///ALTN HOLD
             if (upper.includes("ALTN HOLD")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+                const valueItem = items[i + 4]; // 4 tokens after
 
                 if (!valueItem || !valueItem.str) continue;
 
@@ -5186,6 +5534,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 if (converted === null) continue;
 
                 const t = valueItem.transform || item.transform;
+
+                alternateHoldAnnotation = {
+                    page: 0,
+                    text: converted,
+                    x: t[4] + 65,
+                    y: t[5]
+                };
 
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
@@ -5202,7 +5557,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             if (pageNum === 1) {
                 if (upper.includes("TAXI FUEL")) {
 
-                    const valueItem = textContent.items[i + 2]; // 4 tokens after
+                    const valueItem = items[i + 2]; // 4 tokens after
 
                     if (!valueItem || !valueItem.str) continue;
 
@@ -5211,6 +5566,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     if (converted === null) continue;
 
                     const t = valueItem.transform || item.transform;
+
+                    taxiFuelAnnotation = {
+                        page: 0,
+                        text: converted,
+                        x: t[4] + 65,
+                        y: t[5]
+                    };
 
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
@@ -5227,7 +5589,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///FLT PLAN REQMT
             if (upper.includes("FLT PLAN REQMT")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+                const valueItem = items[i + 4]; // 4 tokens after
 
                 if (!valueItem || !valueItem.str) continue;
 
@@ -5236,6 +5598,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 if (converted === null) continue;
 
                 const t = valueItem.transform || item.transform;
+
+                flightPlanRequirementAnnotation = {
+                    page: 0,
+                    text: converted,
+                    x: t[4] + 65,
+                    y: t[5]
+                };
 
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
@@ -5251,7 +5620,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///EXCESS FUEL
             if (i >= 50 && upper.includes("EXCESS FUEL")) {
 
-                const valueItem = textContent.items[i + 4];
+                const valueItem = items[i + 4];
 
                 if (valueItem && valueItem.str) {
                     const converted = convertFuel(valueItem.str);
@@ -5261,6 +5630,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                         excessFuel = converted;
 
                         const t = valueItem.transform || item.transform;
+
+                        excessFuelAnnotation = {
+                            page: 0,
+                            text: converted,
+                            x: t[4] + 65,
+                            y: t[5]
+                        };
 
                         const tx = t[4] * scale;
                         const ty = viewport.height - (t[5] * scale);
@@ -5275,7 +5651,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///FUEL IN TANKS
             if (upper.includes("FUEL IN TANKS")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+                const valueItem = items[i + 4]; // 4 tokens after
 
                 if (!valueItem || !valueItem.str) continue;
 
@@ -5284,6 +5660,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 if (converted === null) continue;
 
                 const t = valueItem.transform || item.transform;
+
+                fuelInTanksAnnotation = {
+                    page: 0,
+                    text: converted,
+                    x: t[4] + 65,
+                    y: t[5]
+                };
 
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
@@ -5299,7 +5682,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             /// RESERVES
             if (upper.includes("ALTN FUEL")) {
 
-                const fuelItem = textContent.items[i + 4];
+                const fuelItem = items[i + 4];
 
                 if (fuelItem && fuelItem.str) {
 
@@ -5309,7 +5692,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                     altnFuelPos = {
                         tx: t[4] * scale,
-                        ty: viewport.height - (t[5] * scale)
+                        ty: viewport.height - (t[5] * scale),
+
+                        pdfX: t[4],
+                        pdfY: t[5]
                     };
                 }
             }
@@ -5317,7 +5703,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///RESERVES
             if (upper.includes("ALTN HOLD")) {
 
-                const holdItem = textContent.items[i + 4];
+                const holdItem = items[i + 4];
 
                 if (holdItem && holdItem.str) {
                     altnFuelHoldValue = holdItem.str;
@@ -5327,7 +5713,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///ALTN AIRPORT
             if (upper.startsWith("ALTN")) {
 
-                const token = textContent.items[i].str || "";
+                const token = items[i].str || "";
 
                 // match ALTN XXX (YYYY)
                 const match = token.match(/\(([^)]+)\)/);
@@ -5340,7 +5726,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                     altnAirportPos = {
                         tx: t[4] * scale,
-                        ty: viewport.height - (t[5] * scale)
+                        ty: viewport.height - (t[5] * scale),
+
+                        pdfX: t[4],
+                        pdfY: t[5]
                     };
                 }
             }
@@ -5366,7 +5755,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             if (upper.includes("FUEL IN TANKS")) {
 
-                const valueItem = textContent.items[i + 4]; // 4 tokens after
+                const valueItem = items[i + 4]; // 4 tokens after
 
                 if (!valueItem || !valueItem.str) continue;
 
@@ -5375,6 +5764,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 if (converted === null) continue;
 
                 const t = valueItem.transform || item.transform;
+
+                landingFuelAnnotation = {
+                    page: 0,
+                    text: `LDG FUEL: ${ldgFuel}`,
+                    x: t[4] + 22,
+                    y: t[5] - 13
+                };
 
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
@@ -5406,6 +5802,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                 const t = item.transform;
 
+                pzfwAnnotation = {
+                    page: 0,
+                    text: converted,
+                    x: t[4] + 93,
+                    y: t[5]
+                };
+
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
 
@@ -5435,6 +5838,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                 const t = item.transform;
 
+                ptowAnnotation = {
+                    page: 0,
+                    text: converted,
+                    x: t[4] + 93,
+                    y: t[5]
+                };
+
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
 
@@ -5463,6 +5873,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                 const t = item.transform;
 
+                plwtAnnotation = {
+                    page: 0,
+                    text: converted,
+                    x: t[4] + 93,
+                    y: t[5]
+                };
+
                 const tx = t[4] * scale;
                 const ty = viewport.height - (t[5] * scale);
 
@@ -5472,6 +5889,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 octx.fillText(converted, tx + 110, ty + 1);
                 
                 if (rtow !== null) {
+                    rtowAnnotation = {
+                        page: 0,
+                        text: `RTOW ${rtow}`,
+                        x: t[4] + 66,
+                        y: t[5] - 11
+                    };
 
                     octx.fillStyle = "blue";
                     octx.font = "12px Helvetica";
@@ -5479,13 +5902,20 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     octx.fillText(
                         `RTOW ${rtow}`,
                         tx + 71,
-                        ty + 18 // slightly below PLWT line
+                        ty + 18
                     );
                 }
 
                 const excess = calcExcess(rtow, ptow);
 
                 if (excess !== null) {
+
+                    excessAnnotation = {
+                        page: 0,
+                        text: `EXCESS ${excess}`,
+                        x: t[4] + 58,
+                        y: t[5] - 21
+                    };
 
                     octx.fillStyle = "blue";
                     octx.font = "12px Helvetica";
@@ -5496,16 +5926,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
                         ty + 32
                     );
                 }
-
             }
-
             ///BURN ADD/LESS
-
                 if (upper.includes("BURN ADD") || upper.includes("BURN LESS")) {
 
                     console.log("Found", upper, "on page", pageNum);
                     
-                    const targetItem = textContent.items[i + 2];
+                    const targetItem = items[i + 2];
 
                     if (!targetItem || !targetItem.str) continue;
 
@@ -5518,6 +5945,12 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                     const t = targetItem.transform || item.transform;
 
+                    burnAddLessHighlights.push({
+                        page: pageNum - 1,
+                        transform: t,
+                        text: value
+                    });
+                    
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
 
@@ -5531,7 +5964,6 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                     octx.restore();
                 }
-
             ///LEGS PAGES HIGHLIGHTS
             if (
                 sidPage !== null &&
@@ -5539,11 +5971,18 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 pageNum >= sidPage &&
                 pageNum <= starPage
             ) {
-
                 const token = (item.str || "").trim();
                 const match = token.match(/\d{3}\*\d{4}/);
 
                 if (match) {
+                    legsProfileHighlights.push({
+                        page: pageNum - 1,
+                        transform: item.transform,
+                        token: token,
+                        match: match[0],
+                        startIndex: token.indexOf(match[0]),
+                        itemWidth: item.width
+                    });
 
                     const tx = item.transform[4] * scale;
                     const ty = viewport.height - (item.transform[5] * scale);
@@ -5591,6 +6030,13 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                     const t = item.transform;
 
+                    legsNumberHighlights.push({
+                        page: pageNum - 1,
+                        transform: t,
+                        text: token,
+                        colour: colour
+                    });
+
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
 
@@ -5611,10 +6057,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     octx.restore();
                 }
             }
-
-
             ///HIGH GROUND AIRPORT WX HIGHLIGHTS
-            ///AIRPORT WX HIGHLIGHTS
             if (
                 airportWxStartPage !== null &&
                 airportWxEndPage !== null &&
@@ -5639,12 +6082,21 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 ];
 
                 const matchedAirport = wxAirports.find(icao =>
-                    token.includes(icao)
+                    token.includes(icao) && token !== "ADEQUATE"
                 );
 
                 if (matchedAirport) {
 
                     const t = item.transform;
+
+                        highGroundWxHighlights.push({
+                            page: pageNum - 1,
+                            transform: t,
+                            token: token,
+                            text: matchedAirport,
+                            startIndex: token.indexOf(matchedAirport),
+                            itemWidth: item.width
+                        });
 
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
@@ -5682,6 +6134,16 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                     const t = item.transform;
 
+                    destinationNotamAnnotation = {
+                        page: pageNum - 1,
+                        text: "DESTINATION NOTAMS",
+                        x: t[4] + item.width + 14,
+                        y: t[5] - 3,
+                        size: 18,
+                        color: PDFLib.rgb(1, 0, 0),
+                        bold: true
+                    };
+
                     const tx = t[4] * scale;
                     const ty = viewport.height - (t[5] * scale);
 
@@ -5697,7 +6159,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     );
 
                     octx.restore();
-                  }
+                }
               }
 
 
@@ -5727,11 +6189,20 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             const diff = diffHM(depTime, arrTime);
 
+            const text = `BLK: ${diff.hours}h ${diff.mins}m`;
+
+            blockTimeAnnotation = {
+                page: 0,
+                text: text,
+                x: arrPos.tx + 180,
+                y: arrPos.ty
+            };
+
             octx.fillStyle = "blue";
             octx.font = "12px Helvetica";
 
             octx.fillText(
-                `BLK: ${diff.hours}h ${diff.mins}m`,
+                text,
                 arrPos.tx + 180,
                 arrPos.ty
             );
@@ -5740,57 +6211,67 @@ for (let i = 0; i < pagesToRender.length; i++) {
         /// VWS Annotation
         if (pageNum === 1) {
 
+            let lines = [];
+
+            lines.push("VWS:");
+
+            for (const r of results) {
+                lines.push(
+                    `${r.before2 || "?"} ${r.before5 || "?"} ${r.match}`
+                );
+            }
+
+            lines.push("");
+            lines.push("CLB SCHED:");
+
+            for (const m of matches) {
+                lines.push(
+                    `FL${m.code} : ${m.value} ${m.waypointBefore}`
+                );
+            }
+
+            lines.push("");
+            lines.push("IFM BRIEF:");
+            lines.push("WX:");
+
+            for (const range of vwsSummary) {
+                lines.push(range);
+            }
+
+            if (highGroundSummary.length > 0) {
+
+                lines.push("");
+                lines.push("HG:");
+
+                for (const range of highGroundSummary) {
+                    lines.push(range);
+                }
+            }
+
+            vwsAnnotation = {
+                page: 0,
+                x: 735,
+                y: 145,
+                lines: lines
+            };
+
+
+            // existing preview drawing
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
-            octx.fillText("VWS:", 735, 145);
+            let y = 145;
 
-            let y = 160;
-
-            for (const r of results) {
+            for (const line of lines) {
 
                 octx.fillText(
-                    `${r.before2 || "?"} ${r.before5 || "?"} ${r.match}`,
+                    line,
                     735,
                     y
                 );
 
                 y += 15;
             }
-
-            y += 20
-            octx.fillText("CLB SCHED:", 735, y);
-
-            y += 15
-            for (const m of matches) {
-                octx.fillText(`FL${m.code} : ${m.value} ${m.waypointBefore}`, 735, y);
-                y += 15;
-            }
-
-            ///IFM BRIEFING
-            y += 20;
-            octx.fillText("IFM BFIEF:", 735, y);
-            y += 15
-            octx.fillText("WX:", 735, y);
-
-            y += 15;
-            for (const range of vwsSummary) {
-                octx.fillText(range, 735, y);
-                y += 15;
-            }
-
-            if (highGroundSummary.length > 0) {
-                y += 20;
-                octx.fillText("HG:", 735, y);
-
-                y += 15;
-                for (const range of highGroundSummary) {
-
-                    octx.fillText(range, 735, y);
-
-                    y += 15;
-                }
-            }   
         }
         ///Excess block time
         if (depTime && arrTime && burnoffTime) {
@@ -5803,11 +6284,21 @@ for (let i = 0; i < pagesToRender.length; i++) {
             const diffHours = Math.floor(diff / 60);
             const diffMins = diff % 60;
 
+            const text = `NET: ${diffHours}h ${diffMins}m`;
+
+            netTimeAnnotation = {
+                page: 0,
+                text: text,
+                x: arrPos.tx + 180,
+                y: arrPos.ty + 15
+            };
+
+
             octx.fillStyle = "blue";
             octx.font = "12px Helvetica";
 
             octx.fillText(
-                `NET: ${diffHours}h ${diffMins}m`,
+                text,
                 arrPos.tx + 180,
                 arrPos.ty + 15
             );
@@ -5816,38 +6307,51 @@ for (let i = 0; i < pagesToRender.length; i++) {
         //crew rest
         if (burnoffTime) {
 
-                const flightMin = flightToMinutes(burnoffTime);
+            const flightMin = flightToMinutes(burnoffTime);
 
-                // ONLY apply rule if > 8 hours
-                if (flightMin > 480) {
+            // ONLY apply rule if > 8 hours
+            if (flightMin > 480) {
 
-                    const adjusted = flightMin - 90; // subtract 1h30
+                const adjusted = flightMin - 90; // subtract 1h30
 
-                    const half = Math.floor(adjusted / 2);
-                    const third = Math.floor(adjusted / 3);
+                const half = Math.floor(adjusted / 2);
+                const third = Math.floor(adjusted / 3);
 
-                    const halfHM = toHM(half);
-                    const thirdHM = toHM(third);
+                const halfHM = toHM(half);
+                const thirdHM = toHM(third);
 
-                    octx.fillStyle = "blue";
-                    octx.font = "10px Helvetica";
-                    
-                    octx.fillText("Crew Rest:", 750, 1088);
+
+                const lines = [
+                    "Crew Rest:",
+                    `DBL: ${halfHM.hours}h ${halfHM.mins}m`,
+                    `AUG: ${thirdHM.hours}h ${thirdHM.mins}m`
+                ];
+
+                crewRestAnnotation = {
+                    page: 0,
+                    x: 750,
+                    y: 1075,
+                    lines: lines
+                };
+
+                // preview
+                octx.fillStyle = "blue";
+                octx.font = "10px Helvetica";
+
+                let y = 1075;
+
+                for (const line of lines) {
 
                     octx.fillText(
-                        `DBL: ${halfHM.hours}h ${halfHM.mins}m`,
+                        line,
                         750,
-                        1100
+                        y
                     );
 
-                    octx.fillText(
-                        `AUG: ${thirdHM.hours}h ${thirdHM.mins}m`,
-                        750,
-                        1112
-                    );
+                    y += 12;
                 }
             }
-
+        }
 
         ///Reserves
         if (altnFuelValue && altnFuelHoldValue && altnFuelPos) {
@@ -5856,11 +6360,21 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             if (result !== null) {
 
+                const text = `> ${result} ${altnAirport}`;
+
+                reservesAnnotation = {
+                    page: 0,
+                    text: text,
+                    x: altnFuelPos.tx + 90,
+                    y: altnFuelPos.ty + 5,
+                    canvas: true
+                };
+
                 octx.fillStyle = "blue";
                 octx.font = "12px Helvetica";
 
                 octx.fillText(
-                    `> ${result} ${altnAirport}`,
+                    text,
                     altnFuelPos.tx + 90,
                     altnFuelPos.ty + 5
                 );
@@ -5869,34 +6383,70 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
         ///SIDSTAR
         if (pageNum === 1) {
+
+            const lines = [
+                `DEP: ${sidLine || "Not found"}`,
+                `ARR: ${starLine || "Not found"}`
+            ];
+
+            sidStarAnnotation = {
+                page: 0,
+                x: 670,
+                y: 40,
+                lines: lines
+            };
+
+            // preview
             octx.fillStyle = "blue";
             octx.font = "12px Helvetica";
 
-            octx.fillText(
-                `DEP: ${sidLine || "Not found"}`,
-                670,
-                43
-            );
+            let y = 43;
 
-            octx.fillText(
-                `ARR: ${starLine || "Not found"}`,
-                670,
-                58
-            );
+            for (const line of lines) {
+
+                octx.fillText(
+                    line,
+                    670,
+                    y
+                );
+
+                y += 15;
+            }
         }
 
         ///HIGH GROUND
         if (pageNum === 1 && codeList?.length) {
+
+            const lines = [];
+
+            lines.push("HIGH GROUND:");
+
+            for (const c of codeList) {
+
+                lines.push(
+                    `${c.before16 || "?"} | ${c.code} | ${c.before17 || "?"}`
+                );
+            }
+
+
+            highGroundAnnotation = {
+                page: 0,
+                x: 620,
+                y: 145,
+                lines: lines
+            };
+
+
+            // preview
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
-            octx.fillText("HIGH GROUND:", 620, 145);
+            let y = 145;
 
-            let y = 160;
+            for (const line of lines) {
 
-            for (const c of codeList) {
                 octx.fillText(
-                    `${c.before16 || "?"} | ${c.code} | ${c.before17 || "?"}`,
+                    line,
                     620,
                     y
                 );
@@ -5907,273 +6457,474 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
         ///DECOMP PROFILES
         if (pageNum === 1 && codeList?.length) {
+
+            const lines = [];
+
+            lines.push("DECOMP PROFILES:");
+
+            for (const p of profiles) {
+
+                lines.push(
+                    `${p.route} -> ${p.profile}`
+                );
+            }
+
+
+            decompProfilesAnnotation = {
+                page: 0,
+                x: 460,
+                y: 145,
+                lines: lines
+            };
+
+
+            // Preview
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
             let y = 145;
 
-            octx.fillText("DECOMP PROFILES:", 460, y);
-
-            y += 12;
-
-            for (const p of profiles) {
+            for (const line of lines) {
 
                 octx.fillText(
-                    `${p.route} -> ${p.profile}`,
+                    line,
                     460,
                     y
                 );
 
                 y += 12;
-
             }
         }
+
         ///EDTO INFO
         if (pageNum === 1) {
 
+            const lines = [];
+
+            if (edtoGroups.length === 0) {
+
+                lines.push("NON EDTO");
+
+            } else {
+
+                for (const g of edtoGroups) {
+
+                    lines.push("EDTO:");
+                    lines.push(`A1: ${g.airport1 || "-"}`);
+                    lines.push(`${g.start || "-"}`);
+                    lines.push(`A2: ${g.airport2 || "-"}`);
+                    lines.push(`A3: ${g.airport3 || "-"}`);
+                    lines.push(`${g.end || "-"}`);
+                    lines.push(`A4: ${g.airport4 || "-"}`);
+                    lines.push("");
+                }
+            }
+
+            edtoAnnotation = {
+                page: 0,
+                x: 5,
+                y: 145,
+                lines: lines
+            };
+
+            // Preview
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
             let y = 145;
 
-            if (edtoGroups.length === 0) {
-                octx.fillText("NON EDTO", 5, y);
-            } else {
-                for (const g of edtoGroups) {
+            for (const line of lines) {
 
-                    octx.fillText("EDTO:", 5, y);
-                    y += 15;
+                octx.fillText(
+                    line,
+                    5,
+                    y
+                );
 
-                    octx.fillText(`A1: ${g.airport1 || "-"}`, 5, y); y += 15;
-                    octx.fillText(`${g.start || "-"}`, 5, y); y += 15;
-                    octx.fillText(`A2: ${g.airport2 || "-"}`, 5, y); y += 15;
-                    octx.fillText(`A3: ${g.airport3 || "-"}`, 5, y); y += 15;
-                    octx.fillText(`${g.end || "-"}`, 5, y); y += 15;
-                    octx.fillText(`A4: ${g.airport4 || "-"}`, 5, y); y += 25;
-                }
+                y += 15;
             }
         }
 
         ///FIR
         if (pageNum === 2) {
 
+            const lines = [];
+
+            lines.push("FIR INFO:");
+
+            for (const a of annotations) {
+
+                lines.push(
+                    `${a.time || ""}  ${a.fir || ""} - ${a.firName || "not in database"}  ${a.waypoint || ""} ${a.fallbackTime ? "(" + a.fallbackTime + ")" : ""}  ${a.country || ""}`
+                );
+            }
+
+            firAnnotation = {
+                page: 1,
+                x: 65,
+                y: 750,
+                rows: annotations
+            };
+
+            // Preview
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
             let y = 750;
 
-            octx.fillText("FIR INFO:", 65, y);
+            // column positions
+            const x1 = 65;   // TIME
+            const x2 = 100;  // FIR
+            const x3 = 230;  // WAYPOINT
+            const x4 = 280;  // FALLBACK
+            const x5 = 320;  // COUNTRY
 
-            y += 15;
 
             for (const a of annotations) {
 
-            const x1 = 65;   // time
-            const x2 = 95;  // FIR code - FIR name
-            const x3 = 240;  // waypoint
-            const x4 = 280;  // fallback time
-            const x5 = 330;  // country
+                octx.fillText(
+                    a.time || "",
+                    x1,
+                    y
+                );
 
-            // TIME
-            octx.fillText(a.time || "", x1, y);
+                octx.fillText(
+                    `${a.fir || ""} - ${a.firName || ""}`,
+                    x2,
+                    y
+                );
 
-            // FIR CODE - FIR NAME
-            octx.fillText(
-                `${a.fir || ""} - ${a.firName || "not in database"}`,
-                x2,
-                y
-            );
+                octx.fillText(
+                    a.waypoint || "",
+                    x3,
+                    y
+                );
 
-            // WAYPOINT
-            octx.fillText(a.waypoint || "", x3, y);
+                if (a.fallbackTime) {
+                    octx.fillText(
+                        `(${a.fallbackTime})`,
+                        x4,
+                        y
+                    );
+                }
 
-            // FALLBACK TIME
-            if (a.fallbackTime) {
-                octx.fillText(`(${a.fallbackTime})`, x4, y);
-            }
+                octx.fillText(
+                    a.country || "",
+                    x5,
+                    y
+                );
 
-            // COUNTRY
-            octx.fillText(a.country || "", x5, y);
-
-            y += 15;
+                y += 15;
             }
         }
 
         ///WEATHER ANNOTATION
         if (pageNum === 2) {
 
-            octx.fillStyle = "blue";
-            octx.font = "10px Helvetica";
+            const lines = [];
 
-            let y = 750;
-
-            ///DEP SA + FT
-            octx.fillText("Departure WX:", 510, y);
-            y += 12;
+            // DEP SA + FT
+            lines.push({
+                text: "Departure WX:",
+                highlight: false
+            });
 
             for (const weatherLine of depLines) {
 
-                if (isApplicableWeatherLine(weatherLine, depApplicable)) {
-
-                    const x = 510;
-                    const textWidth = octx.measureText(weatherLine).width;
-
-                    octx.fillStyle = "rgba(255,235,59,0.45)";
-                    octx.fillRect(
-                        x - 2,
-                        y - 10,
-                        textWidth + 4,
-                        12
-                    );
-
-                    octx.fillStyle = "blue";
-                    octx.fillText(weatherLine, x, y);
-                }
-
-                octx.fillText(weatherLine, 510, y);
-                y += 12;
+                lines.push({
+                    text: weatherLine,
+                    highlight: isApplicableWeatherLine(
+                        weatherLine,
+                        depApplicable
+                    )
+                });
             }
 
-            y += 5;
 
-            ///DEP WX ANALYSIS
-            octx.fillText(`DEP WX ANALYSIS AT ${notamDepTime}z:`, 510, y);
-            y += 12;
-
-            depWxLines.forEach((line, i) => {
-                octx.fillText(`${i + 1}. ${line}`, 510, y);
-                y += 12;
+            lines.push({
+                text: ""
             });
 
-            y += 20;
 
-            ///DEST SA + FT
-            octx.fillText("Destination WX:", 510, y);
-            y += 12;
+            // DEP ANALYSIS
+            lines.push({
+                text: `DEP WX ANALYSIS AT ${notamDepTime}z:`,
+                highlight: false
+            });
+
+            depWxLines.forEach((line, i) => {
+
+                lines.push({
+                    text: `${i + 1}. ${line}`,
+                    highlight: false
+                });
+
+            });
+
+
+            lines.push({
+                text: ""
+            });
+
+
+            // DEST SA + FT
+            lines.push({
+                text: "Destination WX:",
+                highlight: false
+            });
+
 
             for (const weatherLine of destLines) {
 
-                if (isApplicableWeatherLine(weatherLine, destApplicable)) {
-                    
-                    const x = 510;
-                    const textWidth = octx.measureText(weatherLine).width;
-
-                    octx.fillStyle = "rgba(255,235,59,0.45)";
-                    octx.fillStyle = "rgba(255,235,59,0.45)";
-                    octx.fillRect(
-                        x - 2,
-                        y - 10,
-                        textWidth + 4,
-                        12
-                    );
-
-                    octx.fillStyle = "blue";
-                    octx.fillText(weatherLine, x, y);
-                }
-
-                octx.fillText(weatherLine, 510, y);
-                y += 12;
+                lines.push({
+                    text: weatherLine,
+                    highlight: isApplicableWeatherLine(
+                        weatherLine,
+                        destApplicable
+                    )
+                });
             }
 
-            y += 5;
 
-            ///DEST WX ANALYSIS
-            octx.fillText(`DEST WX ANALYSIS AT ${notamArrTime}z:`, 510, y);
-            y += 15;
+            lines.push({
+                text: ""
+            });
+
+
+            // DEST ANALYSIS
+            lines.push({
+                text: `DEST WX ANALYSIS AT ${notamArrTime}z:`,
+                highlight: false
+            });
+
 
             destWxLines.forEach((line, i) => {
-                octx.fillText(`${i + 1}. ${line}`, 510, y);
-                y += 12;
+
+                lines.push({
+                    text: `${i + 1}. ${line}`,
+                    highlight: false
+                });
+
             });
+
+
+            weatherAnnotation = {
+                page: 1,
+                x: 510,
+                y: 750,
+                lines: lines
+            };
+
+
+            // PREVIEW
+            octx.font = "8px Helvetica";
+
+            let y = 750;
+
+
+            for (const line of lines) {
+
+                if (line.highlight) {
+
+                    const width = octx.measureText(
+                        line.text
+                    ).width;
+
+
+                    octx.fillStyle =
+                        "rgba(255,235,59,0.45)";
+
+
+                    octx.fillRect(
+                        510 - 2,
+                        y - 10,
+                        width + 4,
+                        12
+                    );
+                }
+
+
+                octx.fillStyle = "blue";
+
+                octx.fillText(
+                    line.text,
+                    510,
+                    y
+                );
+
+
+                y += 12;
+            }
         }
 
 
         /// WIND ARROWS RENDER
         if (pageNum === 2) {
 
+            windArrowAnnotation = {
+                page: 1,
+
+                canvasHeight: octx.canvas.height,
+
+                clbWinds: clbWinds,
+                desWinds: desWinds,
+
+                clbX: 655,
+                clbY: 1100,
+
+                desX: 655,
+                desY: 1180
+            };
+
+
+            // PREVIEW
+
             octx.fillStyle = "blue";
             octx.font = "10px Helvetica";
 
-            octx.fillText("CLB WINDS:", 625, 1070);
+            octx.fillText(
+                "CLB WINDS:",
+                625,
+                1070
+            );
+
 
             let x = 655;
-            let y = 1100;
 
             for (const w of clbWinds) {
 
-                drawWindArrow(octx, x, y, w.dir, w.spd);
-
-                x += 50; // spacing between wind blocks
-            }
-
-            y += 10;
-
-            octx.fillStyle = "blue";
-            octx.font = "10px Helvetica";
-
-            octx.fillText("DES WINDS:", 625, 1150);
-
-            x = 655;
-            y = 1180;
-
-            for (const w of desWinds) {
-
-                drawWindArrow(octx, x, y, w.dir, w.spd);
+                drawWindArrow(
+                    octx,
+                    x,
+                    1100,
+                    w.dir,
+                    w.spd
+                );
 
                 x += 50;
             }
-        }
 
-        ///WIND ARROW FL LABELS CLB
-        if (pageNum === 2) {
-            const flSpacing = 50; // ← change this to control spacing
 
-            const fls = ["100", "180", "240", "300"];
+            octx.fillText(
+                "DES WINDS:",
+                625,
+                1150
+            );
 
-            octx.fillStyle = "blue";
+
+            x = 655;
+
+            for (const w of desWinds) {
+
+                drawWindArrow(
+                    octx,
+                    x,
+                    1180,
+                    w.dir,
+                    w.spd
+                );
+
+                x += 50;
+            }
+
+            // FL LABELS
+
+            const flSpacing = 50;
+
+
             octx.font = "8px Helvetica";
 
-            let x = 655;
-            const y = 1080;
 
-            for (const fl of fls) {
+            const clbFls = [
+                "100",
+                "180",
+                "240",
+                "300"
+            ];
 
-                octx.fillText(`FL${fl}`, x, y);
+            x = 655;
+
+            for (const fl of clbFls) {
+
+                octx.fillText(
+                    `FL${fl}`,
+                    x,
+                    1080
+                );
 
                 x += flSpacing;
             }
-        }
 
-        ///WIND ARROW FL LABELS DES
-        if (pageNum === 2) {
-            const flSpacing = 50; // adjust spacing between FLs
 
-            const fls = ["350", "310", "200", "100"];
+            const desFls = [
+                "350",
+                "310",
+                "200",
+                "100"
+            ];
 
-            octx.fillStyle = "blue";
-            octx.font = "8px Helvetica";
 
-            let x = 655;
-            const y = 1160;
+            x = 655;
 
-            for (const fl of fls) {
+            for (const fl of desFls) {
 
-                octx.fillText(`FL${fl}`, x, y);
+                octx.fillText(
+                    `FL${fl}`,
+                    x,
+                    1160
+                );
 
                 x += flSpacing;
             }
+
+
+            windArrowAnnotation.clbFls = clbFls;
+            windArrowAnnotation.desFls = desFls;
         }
 
+        /// NEW INTAMS
+        if (pageNum === 1 && recentIntamDates.length) {
+            const lines = [];
+            lines.push("CREW BULLETINS:");
+            lines.push(`${recentIntamDates.length} NEW INTAMS`);
+            crewBulletinAnnotation = {
+                page: 0,
+                x: 460,
+                y: 210,
+                lines: lines,
+                color: "red"
+            };
+            // Preview
+            octx.fillStyle = "red";
+            octx.font = "10px Helvetica";
+            let y = 210;
+            for (const line of lines) {
 
+                octx.fillText(
+                    line,
+                    460,
+                    y
+                );
+                y += 12;
+            }
+        }
 
         ///PAGE TITLES
         ///PLAN NUMBER
         if (pageNum === 1) {
 
+            pageTitleAnnotations.push({
+                page: 0,
+                text: `${planNumber} ${burnoffTime.replace(".", ":")} ${aircraftRegistration}`,
+                x: 20,
+                y: 50,
+                canvasHeight: octx.canvas.height
+            });
+
             octx.save();
 
             octx.font = "bold 36px Arial";
-            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+            octx.fillStyle = "rgba(255,0,0,0.9)";
 
             octx.fillText(
                 `${planNumber} ${burnoffTime.replace(".", ":")} ${aircraftRegistration}`,
@@ -6185,6 +6936,14 @@ for (let i = 0; i < pagesToRender.length; i++) {
         }
         ///ATC FLIGHT PLAN
         if (pageNum === atcFlightPlanPage) {
+
+            pageTitleAnnotations.push({
+                page: atcFlightPlanPage - 1,
+                text: "ATC FLIGHT PLAN",
+                x: 20,
+                y: 50,
+                canvasHeight: octx.canvas.height
+            });
 
             octx.save();
 
@@ -6202,6 +6961,14 @@ for (let i = 0; i < pagesToRender.length; i++) {
         // ROUTE
         if (pageNum === sidPage) {
 
+            pageTitleAnnotations.push({
+                page: sidPage - 1,
+                text: "ROUTE LEGS",
+                x: 20,
+                y: 50,
+                canvasHeight: octx.canvas.height
+            });
+
             octx.save();
 
             octx.font = "bold 36px Arial";
@@ -6217,6 +6984,14 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
         // EDTO
         if (pageNum === edtoStartPage) {
+
+            pageTitleAnnotations.push({
+                page: edtoStartPage - 1,
+                text: "EDTO INFORMATION",
+                x: 20,
+                y: 50,
+                canvasHeight: octx.canvas.height
+            });
 
             octx.save();
 
@@ -6234,6 +7009,14 @@ for (let i = 0; i < pagesToRender.length; i++) {
         // AIRPORT WEATHER
         if (pageNum === airportWxStartPage) {
 
+            pageTitleAnnotations.push({
+                page: airportWxStartPage - 1,
+                text: "WEATHER/TAF",
+                x: 20,
+                y: 50,
+                canvasHeight: octx.canvas.height
+            });
+
             octx.save();
 
             octx.font = "bold 36px Arial";
@@ -6249,6 +7032,14 @@ for (let i = 0; i < pagesToRender.length; i++) {
         
         // NOTAMS
         if (pageNum === notamStartPage) {
+
+            pageTitleAnnotations.push({
+                page: notamStartPage - 1,
+                text: "NOTAMS DEP/ARR",
+                x: 20,
+                y: 50,
+                canvasHeight: octx.canvas.height
+            });
 
             octx.save();
 
@@ -6266,6 +7057,14 @@ for (let i = 0; i < pagesToRender.length; i++) {
         // INTAMS
         if (pageNum === crewBulletinStartPage) {
 
+            intamTitleAnnotation = {
+                page: crewBulletinStartPage - 1,
+                text: "INTAMS",
+                x: 20,
+                y: 50,
+                canvasHeight: octx.canvas.height
+            };
+
             octx.save();
 
             octx.font = "bold 36px Arial";
@@ -6279,7 +7078,19 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.restore();
         }
 
+
+        // Bulletin list
         if (pageNum === pdf.numPages) {
+
+            bulletinAnnotation = {
+                page: pdf.numPages - 1,
+                x: 65,
+                y: 190,
+                lineHeight: 20,
+                lines: bulletinAnnotations.slice(),
+                canvasHeight: octx.canvas.height
+            };
+
             const startY = 190;
             const lineHeight = 20;
 
@@ -6287,44 +7098,55 @@ for (let i = 0; i < pagesToRender.length; i++) {
             octx.fillStyle = "blue";
 
             bulletinAnnotations.forEach((m, idx) => {
-                octx.fillText(`${idx + 1}. ${m}`, 65, startY + idx * lineHeight);
+
+                octx.fillText(
+                    `${idx + 1}. ${m}`,
+                    65,
+                    startY + idx * lineHeight
+                );
             });
         }
 
-        if (pageNum === 1) {
+    if (pageNum === 1) {
 
-            let tocY = 1050;
+        tocAnnotation = {
+            page: 0,
+            x: 5,
+            y: 1050,
+            lineHeight: 18,
+            canvasHeight: octx.canvas.height,
+            entries: [
+                { text: "LEGS", page: sidPage - 1 },
+                { text: "EDTO", page: edtoStartPage - 1 },
+                { text: "ATC FLT PLN", page: atcFlightPlanPage - 1 },
+                { text: "WEATHER", page: airportWxStartPage - 1 },
+                { text: "DEP NOTAMS", page: notamStartPage - 1 },
+                { text: "ARR NOTAMS", page: notamDestPage - 1 },   // we'll improve this
+                { text: "INTAMS", page: crewBulletinStartPage - 1 },
+                { text: "WX CHARTS", page: weatherChartsPage - 1 }
+            ]
+        };
 
-            octx.fillStyle = "blue";
-            octx.font = "12px Helvetica";
-            octx.fillText("Quick Links:", 5, tocY);
+        let tocY = 1050;
+
+        octx.fillStyle = "blue";
+        octx.font = "12px Helvetica";
+
+        octx.fillText("Quick Links:", 5, tocY);
+
+        tocY += 18;
+
+        for (const e of tocAnnotation.entries) {
+
+            octx.fillText(
+                e.text,
+                5,
+                tocY
+            );
 
             tocY += 18;
-            octx.font = "12px Helvetica";
-
-            octx.fillText(`LEGS`, 5, tocY);
-
-            tocY += 18;
-            octx.fillText(`EDTO`, 5, tocY);
-
-            tocY += 18;
-            octx.fillText(`ATC FLT PLN`, 5, tocY);
-
-            tocY += 18;
-            octx.fillText(`WEATHER`, 5, tocY);
-
-            tocY += 18;
-            octx.fillText(`DEP NOTAMS`, 5, tocY);
-
-            tocY += 18;
-            octx.fillText(`ARR NOTAMS`, 5, tocY);
-
-            tocY += 18;
-            octx.fillText(`INTAMS`, 5, tocY);
-
-            tocY += 18;
-            octx.fillText(`WX CHARTS`, 5, tocY);
         }
+    }
 
 
 
@@ -6358,106 +7180,984 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
         return;
     }
 
-    const { jsPDF } = window.jspdf;
+    const pdfDoc = await PDFLib.PDFDocument.load(
+        originalPdfBuffer.slice(0)
+    );
 
-    const pdf = new jsPDF({
-        orientation: "portrait",
-        unit: "px",
-        format: [
-            renderedPages[0].pdfCanvas.width,
-            renderedPages[0].pdfCanvas.height
-        ]
-    });
+    pdfDoc.registerFontkit(fontkit);
 
-    for (let p = 0; p < renderedPages.length; p++) {
+    const pdfPages = pdfDoc.getPages();
 
-        const page = renderedPages[p];
+    const firstPage = pdfPages[0];
 
-        const merged = document.createElement("canvas");
-        merged.width = page.pdfCanvas.width;
-        merged.height = page.pdfCanvas.height;
+    const fontBytes = await fetch("ARIAL.TTF")
+        .then(res => res.arrayBuffer());
 
-        const ctx = merged.getContext("2d");
+    const unicodeFont = await pdfDoc.embedFont(fontBytes);
 
-        ctx.drawImage(page.pdfCanvas, 0, 0);
-        ctx.drawImage(page.overlay, 0, 0);
-
-        const img = merged.toDataURL("image/jpeg", 1.0);
-
-        if (p === 0) {
-
-            if (sidOutputPage) {
-                pdf.link(5, 1055, 70, 15, {
-                    pageNumber: sidOutputPage
-                });
-            }
-
-            if (edtoOutputPage) {
-                pdf.link(5, 1073, 70, 15, {
-                    pageNumber: edtoOutputPage
-                });
-            }
-
-            if (atcOutputPage) {
-                pdf.link(5, 1090, 70, 15, {
-                    pageNumber: atcOutputPage
-                });
-            }
-
-            if (wxOutputPage) {
-                pdf.link(5, 1110, 70, 15, {
-                    pageNumber: wxOutputPage
-                });
-            }
-
-            if (notamOutputPage) {
-                pdf.link(5, 1128, 70, 15, {
-                    pageNumber: notamOutputPage
-                });
-            }
-
-            if (notamDestOutputPage) {
-                pdf.link(5, 1146, 70, 15, {
-                    pageNumber: notamDestOutputPage
-                });
-            }
-
-            if (crewOutputPage) {
-                pdf.link(5, 1164, 70, 15, {
-                    pageNumber: crewOutputPage
-                });
-            }
-
-            if (weatherChartsOutputPage) {
-                pdf.link(5, 1186, 70, 15, {
-                    pageNumber: weatherChartsOutputPage
-                });
-            }
-        }
-
-        if (p > 0) {
-            pdf.addPage(
-                [merged.width, merged.height],
-                merged.width > merged.height ? "landscape" : "portrait"
-            );
-        }
-
-        pdf.addImage(
-            img,
-            "JPEG",
-            0,
-            0,
-            merged.width,
-            merged.height
+    if (planHighlight) {
+        drawHighlight(
+            pdfPages[0],
+            planHighlight.transform,
+            planHighlight.text
         );
     }
+
+    if (captHighlight) {
+        drawHighlight(
+            pdfPages[0],
+            captHighlight.transform,
+            captHighlight.text
+        );
+    }
+
+    if (aircraftTypeHighlight) {
+        drawHighlight(
+            pdfPages[0],
+            aircraftTypeHighlight.transform,
+            aircraftTypeHighlight.text
+        );
+    }
+
+    if (registrationHighlight) {
+        drawHighlight(
+            pdfPages[0],
+            registrationHighlight.transform,
+            registrationHighlight.text
+        );
+    }
+
+    if (flightNumberHighlight) {
+        drawHighlight(
+            pdfPages[0],
+            flightNumberHighlight.transform,
+            flightNumberHighlight.text
+        );
+    }
+
+    if (depArrHighlight) {
+        drawHighlight(
+            pdfPages[0],
+            depArrHighlight.transform,
+            depArrHighlight.text
+        );
+    }
+
+    if (depTimeHighlight) {
+        drawOffsetHighlight(
+            pdfPages[0],
+            depTimeHighlight.transform,
+            10 * 6,
+            4 * 6
+        );
+    }
+
+    if (arrTimeHighlight) {
+        drawOffsetHighlight(
+            pdfPages[0],
+            arrTimeHighlight.transform,
+            10 * 6,
+            4 * 6
+        );
+    }
+
+    if (apdHighlight) {
+        const offset = (apdHighlight.text.length - 3) * 6;
+        drawOffsetHighlight(
+            pdfPages[0],
+            apdHighlight.transform,
+            offset,
+            3 * 6
+        );
+    }
+
+    if (burnoffAnnotation) {
+        drawPdfText(
+            pdfPages[burnoffAnnotation.page],
+            burnoffAnnotation.text,
+            burnoffAnnotation.x,
+            burnoffAnnotation.y
+        );
+    }
+
+    if (contingencyAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            contingencyAnnotation.text,
+            contingencyAnnotation.x,
+            contingencyAnnotation.y
+        );
+    }
+
+    if (alternateFuelAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            alternateFuelAnnotation.text,
+            alternateFuelAnnotation.x,
+            alternateFuelAnnotation.y
+        );
+    }
+
+    if (alternateHoldAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            alternateHoldAnnotation.text,
+            alternateHoldAnnotation.x,
+            alternateHoldAnnotation.y
+        );
+    }
+
+    if (taxiFuelAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            taxiFuelAnnotation.text,
+            taxiFuelAnnotation.x,
+            taxiFuelAnnotation.y
+        );
+    }
+
+    if (flightPlanRequirementAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            flightPlanRequirementAnnotation.text,
+            flightPlanRequirementAnnotation.x,
+            flightPlanRequirementAnnotation.y
+        );
+    }
+
+    if (excessFuelAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            excessFuelAnnotation.text,
+            excessFuelAnnotation.x,
+            excessFuelAnnotation.y
+        );
+    }
+
+    if (fuelInTanksAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            fuelInTanksAnnotation.text,
+            fuelInTanksAnnotation.x,
+            fuelInTanksAnnotation.y
+        );
+    }
+
+    if (landingFuelAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            landingFuelAnnotation.text,
+            landingFuelAnnotation.x,
+            landingFuelAnnotation.y
+        );
+    }
+
+    if (pzfwAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            pzfwAnnotation.text,
+            pzfwAnnotation.x,
+            pzfwAnnotation.y
+        );
+    }
+
+    if (ptowAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            ptowAnnotation.text,
+            ptowAnnotation.x,
+            ptowAnnotation.y
+        );
+    }
+
+    if (plwtAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            plwtAnnotation.text,
+            plwtAnnotation.x,
+            plwtAnnotation.y
+        );
+    }
+
+    if (rtowAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            rtowAnnotation.text,
+            rtowAnnotation.x,
+            rtowAnnotation.y
+        );
+    }
+
+    if (excessAnnotation) {
+        drawPdfText(
+            pdfPages[0],
+            excessAnnotation.text,
+            excessAnnotation.x,
+            excessAnnotation.y
+        );
+    }
+
+    for (const h of burnAddLessHighlights) {
+        drawHighlight(
+            pdfPages[h.page],
+            h.transform,
+            h.text
+        );
+    }
+
+    for (const h of legsProfileHighlights) {
+        drawLegProfileHighlight(
+            pdfPages[h.page],
+            h
+        );
+    }
+
+    for (const h of legsNumberHighlights) {
+        drawColourHighlight(
+            pdfPages[h.page],
+            h
+        );
+    }
+
+    for (const h of highGroundWxHighlights) {
+        drawWxAirportHighlight(
+            pdfPages[h.page],
+            h
+        );
+    }
+
+    if (destinationNotamAnnotation) {
+        const page = pdfPages[destinationNotamAnnotation.page];
+        page.drawText(
+            destinationNotamAnnotation.text,
+            {
+                x: destinationNotamAnnotation.x,
+                y: destinationNotamAnnotation.y,
+                size: destinationNotamAnnotation.size,
+                color: destinationNotamAnnotation.color,
+                font: unicodeFont
+            }
+        );
+    }
+
+    if (blockTimeAnnotation) {
+
+        const page = pdfPages[blockTimeAnnotation.page];
+
+        font: unicodeFont
+
+        page.drawText(
+            blockTimeAnnotation.text,
+            {
+                x: blockTimeAnnotation.x / 1.5,
+                y: page.getHeight() - (blockTimeAnnotation.y / 1.5),
+                size: 8,
+                font: unicodeFont,
+                color: PDFLib.rgb(0,0,1)
+            }
+        );
+    }
+
+    if (vwsAnnotation) {
+        const page = pdfPages[vwsAnnotation.page];
+        font: unicodeFont;
+        const exportScale = 1.5;
+        let y = page.getHeight() - (vwsAnnotation.y / exportScale);
+        for (const line of vwsAnnotation.lines) {
+            page.drawText(
+                line,
+                {
+                    x: vwsAnnotation.x / exportScale,
+                    y: y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0, 0, 1)
+                }
+            );
+            y -= 10;
+        }
+    }
+
+    if (netTimeAnnotation) {
+        const page = pdfPages[netTimeAnnotation.page];
+        font: unicodeFont;
+        page.drawText(
+            netTimeAnnotation.text,
+            {
+                x: netTimeAnnotation.x / 1.5,
+                y: page.getHeight() - (netTimeAnnotation.y / 1.5),
+                size: 8,
+                font: unicodeFont,
+                color: PDFLib.rgb(0,0,1)
+            }
+        );
+    }
+
+    if (crewRestAnnotation) {
+        const page = pdfPages[crewRestAnnotation.page];
+        font: unicodeFont;
+        let y = page.getHeight() - (crewRestAnnotation.y / 1.5);
+        for (const line of crewRestAnnotation.lines) {
+            page.drawText(
+                line,
+                {
+                    x: crewRestAnnotation.x / 1.5,
+                    y: y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+            y -= 8;
+        }
+    }
+
+    if (reservesAnnotation.canvas) {
+        const page = pdfPages[reservesAnnotation.page];
+        page.drawText(
+            reservesAnnotation.text,
+            {
+                x: reservesAnnotation.x / 1.5,
+                y: page.getHeight() - (reservesAnnotation.y / 1.5),
+                size: 8,
+                font: unicodeFont,
+                color: PDFLib.rgb(0,0,1)
+            }
+        );
+
+    } else {
+        drawPdfText(
+            pdfPages[reservesAnnotation.page],
+            reservesAnnotation.text,
+            reservesAnnotation.x,
+            reservesAnnotation.y
+        );
+    }
+
+    if (sidStarAnnotation) {
+        const page = pdfPages[sidStarAnnotation.page];
+        font: unicodeFont;
+        let y = page.getHeight() - (sidStarAnnotation.y / 1.5);
+        for (const line of sidStarAnnotation.lines) {
+            page.drawText(
+                line,
+                {
+                    x: sidStarAnnotation.x / 1.5,
+                    y: y,
+                    size: 8,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+            y -= 10;
+        }
+    }
+
+    if (highGroundAnnotation) {
+        const page = pdfPages[highGroundAnnotation.page];
+        font: unicodeFont;
+        let y = page.getHeight() - (highGroundAnnotation.y / 1.5);
+        for (const line of highGroundAnnotation.lines) {
+            page.drawText(
+                line,
+                {
+                    x: highGroundAnnotation.x / 1.5,
+                    y: y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+            y -= 10;
+        }
+    }
+
+    if (decompProfilesAnnotation) {
+        const page = pdfPages[decompProfilesAnnotation.page];
+        font: unicodeFont;
+        let y = page.getHeight() - (decompProfilesAnnotation.y / 1.5);
+        for (const line of decompProfilesAnnotation.lines) {
+            page.drawText(
+                line,
+                {
+                    x: decompProfilesAnnotation.x / 1.5,
+                    y: y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+            y -= 10;
+        }
+    }
+
+    if (edtoAnnotation) {
+        const page = pdfPages[edtoAnnotation.page];
+        font: unicodeFont;
+        let y = page.getHeight() - (edtoAnnotation.y / 1.5);
+        for (const line of edtoAnnotation.lines) {
+            page.drawText(
+                line,
+                {
+                    x: edtoAnnotation.x / 1.5,
+                    y: y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+            y -= 10;
+        }
+    }
+
+    if (firAnnotation) {
+        const page = pdfPages[firAnnotation.page];
+        let y = page.getHeight() - (firAnnotation.y / 1.5);
+        for (const a of firAnnotation.rows) {
+
+            page.drawText(
+                a.time || "",
+                {
+                    x: 65 / 1.5,
+                    y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+
+            page.drawText(
+                `${a.fir || ""} - ${a.firName || ""}`,
+                {
+                    x: 100 / 1.5,
+                    y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+
+            page.drawText(
+                a.waypoint || "",
+                {
+                    x: 230 / 1.5,
+                    y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+
+            if (a.fallbackTime) {
+
+                page.drawText(
+                    `(${a.fallbackTime})`,
+                    {
+                        x: 280 / 1.5,
+                        y,
+                        size: 6,
+                        font: unicodeFont,
+                        color: PDFLib.rgb(0,0,1)
+                    }
+                );
+            }
+
+            page.drawText(
+                a.country || "",
+                {
+                    x: 320 / 1.5,
+                    y,
+                    size: 6,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+
+            y -= 10;
+        }
+    }
+
+    if (weatherAnnotation) {
+
+        const page = pdfPages[weatherAnnotation.page];
+
+        const font = unicodeFont;
+
+        let y =
+            page.getHeight()
+            - (weatherAnnotation.y / 1.5);
+
+
+        for (const line of weatherAnnotation.lines) {
+
+
+            if (line.highlight) {
+
+                page.drawRectangle({
+                    x: weatherAnnotation.x / 1.5 - 2,
+                    y: y - 2,
+                    width:
+                        (line.text.length * 5.5) / 1.5,
+                    height: 12,
+                    color: PDFLib.rgb(
+                        1,
+                        0.92,
+                        0.2
+                    ),
+                    opacity: 0.45
+                });
+            }
+
+
+            page.drawText(
+                line.text,
+                {
+                    x: weatherAnnotation.x / 1.5,
+                    y: y,
+                    size: 6,
+                    font: font,
+                    color: PDFLib.rgb(0,0,1)
+                }
+            );
+
+
+            y -= 8;
+        }
+    }
+
+    if (windArrowAnnotation) {
+
+        const page = pdfPages[windArrowAnnotation.page];
+
+        const scale = 1.5;
+        const canvasHeight = windArrowAnnotation.canvasHeight;
+
+        // =====================
+        // CLIMB TITLE
+        // =====================
+
+        page.drawText(
+            "CLB WINDS:",
+            {
+                x: 625 / scale,
+                y: (canvasHeight - 1070) / scale,
+                size: 7,
+                font: unicodeFont,
+                color: PDFLib.rgb(0, 0, 1)
+            }
+        );
+
+        // =====================
+        // CLIMB WINDS
+        // =====================
+
+        let x = windArrowAnnotation.clbX / scale;
+
+        const clbY =
+            (canvasHeight - windArrowAnnotation.clbY) / scale;
+
+        for (const w of windArrowAnnotation.clbWinds) {
+
+            drawPdfWindArrow(
+                page,
+                x,
+                clbY,
+                w.dir,
+                w.spd,
+                unicodeFont
+            );
+
+            x += 50 / scale;
+        }
+
+        // =====================
+        // CLIMB FL LABELS
+        // =====================
+
+        x = 655 / scale;
+
+        const clbLabelY =
+            (canvasHeight - 1080) / scale;
+
+        for (const fl of windArrowAnnotation.clbFls) {
+
+            page.drawText(
+                `FL${fl}`,
+                {
+                    x,
+                    y: clbLabelY,
+                    size: 5,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0, 0, 1)
+                }
+            );
+
+            x += 50 / scale;
+        }
+
+
+        // =====================
+        // DESCENT TITLE
+        // =====================
+
+        page.drawText(
+            "DES WINDS:",
+            {
+                x: 625 / scale,
+                y: (canvasHeight - 1150) / scale,
+                size: 7,
+                font: unicodeFont,
+                color: PDFLib.rgb(0, 0, 1)
+            }
+        );
+
+        // =====================
+        // DESCENT WINDS
+        // =====================
+
+        x = windArrowAnnotation.desX / scale;
+
+        const desY =
+            (canvasHeight - windArrowAnnotation.desY) / scale;
+
+        for (const w of windArrowAnnotation.desWinds) {
+
+            drawPdfWindArrow(
+                page,
+                x,
+                desY,
+                w.dir,
+                w.spd,
+                unicodeFont
+            );
+
+            x += 50 / scale;
+        }
+
+        // =====================
+        // DESCENT FL LABELS
+        // =====================
+
+        x = 655 / scale;
+
+        const desLabelY =
+            (canvasHeight - 1160) / scale;
+
+        for (const fl of windArrowAnnotation.desFls) {
+
+            page.drawText(
+                `FL${fl}`,
+                {
+                    x,
+                    y: desLabelY,
+                    size: 5,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0, 0, 1)
+                }
+            );
+
+            x += 50 / scale;
+        }
+    }
+
+    if (crewBulletinAnnotation) {
+
+        const page = pdfPages[crewBulletinAnnotation.page];
+
+        drawPdfMultiline(
+            page,
+            crewBulletinAnnotation.lines,
+            crewBulletinAnnotation.x,
+            crewBulletinAnnotation.y,
+            {
+                font: unicodeFont,
+                size: 10,
+                color: PDFLib.rgb(1, 0, 0), // red
+                lineHeight: 12
+            }
+        );
+    }
+
+    const scale = 1.5;
+
+    for (const t of pageTitleAnnotations) {
+
+        const page = pdfPages[t.page];
+
+        page.drawText(
+            t.text,
+            {
+                x: t.x / scale,
+                y: (t.canvasHeight - t.y) / scale,
+                size: 24,
+                font: unicodeFont,
+                color: PDFLib.rgb(1, 0, 0)
+            }
+        );
+    }
+
+    if (intamTitleAnnotation) {
+
+        const page = pdfPages[intamTitleAnnotation.page];
+
+        page.drawText(
+            intamTitleAnnotation.text,
+            {
+                x: intamTitleAnnotation.x / scale,
+                y: (intamTitleAnnotation.canvasHeight - intamTitleAnnotation.y) / scale,
+                size: 24,
+                font: unicodeFont,
+                color: PDFLib.rgb(1, 0, 0)
+            }
+        );
+    }
+
+
+    if (bulletinAnnotation) {
+
+        const page = pdfPages[bulletinAnnotation.page];;
+
+        const pdfY =
+            (bulletinAnnotation.canvasHeight - bulletinAnnotation.y) / scale;
+
+        let y = bulletinAnnotation.y;
+
+        for (let i = 0; i < bulletinAnnotation.lines.length; i++) {
+
+            page.drawText(
+                `${i + 1}. ${bulletinAnnotation.lines[i]}`,
+                {
+                    x: bulletinAnnotation.x / scale,
+                    y: (bulletinAnnotation.canvasHeight - y) / scale,
+                    size: 8,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0, 0, 1)
+                }
+            );
+
+            y += bulletinAnnotation.lineHeight;
+        }
+    }
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+    const exportDoc = await PDFLib.PDFDocument.create();
+
+    exportDoc.registerFontkit(fontkit);
+
+    const exportFontBytes = await fetch("ARIAL.TTF")
+        .then(res => res.arrayBuffer());
+
+    const exportUnicodeFont = await exportDoc.embedFont(exportFontBytes);
+
+    const pagesToKeep = [];
+
+    // Always keep page 1 and 2
+    pagesToKeep.push(0);
+    pagesToKeep.push(1);
+
+    // Keep all LEGS pages
+    if (
+        legsStartPage !== null &&
+        legsEndPage !== null
+    ) {
+        for (
+            let p = legsStartPage - 1;
+            p <= legsEndPage - 1;
+            p++
+        ) {
+            pagesToKeep.push(p);
+        }
+    }
+
+    // Keep EDTO pages
+    if (
+        edtoStartPage !== null &&
+        edtoEndPage !== null
+    ) {
+        for (
+            let p = edtoStartPage - 1;
+            p <= edtoEndPage - 1;
+            p++
+        ) {
+            pagesToKeep.push(p);
+        }
+    }
+
+    for (const p of forecastWindPages) {
+        pagesToKeep.push(p - 1);
+    }
+
+    // Keep ATC Flight Plan page
+    if (atcFlightPlanPage !== null) {
+        pagesToKeep.push(atcFlightPlanPage - 1);
+    }
+
+    // Keep WX pages
+    if (
+        wxStartPage !== null &&
+        wxEndPage !== null
+    ) {
+        for (
+            let p = wxStartPage - 1;
+            p <= wxEndPage - 1;
+            p++
+        ) {
+            pagesToKeep.push(p);
+        }
+    }
+
+    // Keep NOTAM pages
+    if (
+        notamStartPage !== null &&
+        notamEndPage !== null
+    ) {
+        for (
+            let p = notamStartPage - 1;
+            p <= notamEndPage - 1;
+            p++
+        ) {
+            pagesToKeep.push(p);
+        }
+    }
+
+    // Keep Crew Bulletin pages to end of PDF
+    if (crewBulletinStartPage !== null) {
+
+        for (
+            let p = crewBulletinStartPage - 1;
+            p < pdfPages.length;
+            p++
+        ) {
+            pagesToKeep.push(p);
+        }
+
+    }
+
+    const copiedPages = await exportDoc.copyPages(
+        pdfDoc,
+        pagesToKeep
+    );
+
+    copiedPages.forEach(page => {
+        exportDoc.addPage(page);
+    });
+
+    const pageMap = {};
+
+    pagesToKeep.forEach((originalPage, index) => {
+        pageMap[originalPage] = index;
+    });
+
+        for (const h of notamHighlights) {
+
+        const exportPageIndex = pageMap[h.page];
+
+        if (exportPageIndex === undefined)
+            continue;
+
+        const page = exportDoc.getPages()[exportPageIndex];
+
+        const scale = 1.5;
+
+        page.drawRectangle({
+            x: h.x / scale - 2,
+
+            y:
+                page.getHeight()
+                - ((h.y - 12) / scale)
+                - (18 / scale),
+
+            width:
+                (h.width + 4) / scale,
+
+            height:
+                18 / scale,
+
+            color: PDFLib.rgb(1,0.92,0.2),
+            opacity: 0.45
+        });
+    }
+
+    if (tocAnnotation) {
+
+        const page = exportDoc.getPages()[0];
+
+        const x = tocAnnotation.x / scale;
+
+        let y =
+            (tocAnnotation.canvasHeight - tocAnnotation.y) / scale;
+
+        // Heading
+        page.drawText("Quick Links:", {
+            x,
+            y,
+            size: 8,
+            font: exportUnicodeFont,
+            color: PDFLib.rgb(0, 0, 1)
+        });
+
+        y -= tocAnnotation.lineHeight / scale;
+
+        // Entries
+        for (const entry of tocAnnotation.entries) {
+
+            page.drawText(entry.text, {
+                x,
+                y,
+                size: 8,
+                font: exportUnicodeFont,
+                color: PDFLib.rgb(0, 0, 1)
+            });
+
+
+            const target = exportDoc.getPages()[pageMap[entry.page]];
+
+            addPdfPageLink(
+                exportDoc,
+                page,
+                target,
+                x,
+                y - 2,
+                70,
+                10
+            );
+
+
+            y -= tocAnnotation.lineHeight / scale;
+        }
+    }
+
+    const bytes = await exportDoc.save();
 
     const fileName =
         dep && arr && date
             ? `${dep}${arr}${date}.pdf`
             : "Annotated_OFP.pdf";
 
-    pdf.save(fileName);
+    const blob = new Blob([bytes], {
+        type: "application/pdf"
+    });
+
+    const url = URL.createObjectURL(blob);
+
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = fileName;
+    a.click();
+
+    URL.revokeObjectURL(url);
 });
 
 </script>
