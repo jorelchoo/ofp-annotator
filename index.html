@@ -1709,7 +1709,17 @@ function drawWxAirportHighlight(page, h) {
         color: PDFLib.rgb(1, 0.92, 0.23),
         opacity: 0.5
     });
+}
 
+function drawForecastHighlight(page, h) {
+    page.drawRectangle({
+        x: h.x,
+        y: h.y - 2,
+        width: h.width,
+        height: 10,
+        color: PDFLib.rgb(1, 0.92, 0.23),
+        opacity: 0.5
+    });
 }
 
 function drawPdfWindArrow(page, x, y, dirDeg, speed, font) {
@@ -1826,7 +1836,40 @@ function addPdfPageLink(pdfDoc, page, targetPage, x, y, width, height) {
     annots.push(linkRef);
 }
 
+///GLOBAL ANNOTATION HELPER
+function addTextAnnotation({
+    page,
+    x,
+    y,
+    text,
+    font = "10px Helvetica",
+    color = "blue",
+    pdfSize = 10,
+    canvasHeight
+}) {
+
+    // Preview
+    octx.save();
+    octx.font = font;
+    octx.fillStyle = color;
+    octx.fillText(text, x, y);
+    octx.restore();
+
+    // PDF
+    textAnnotations.push({
+        page,
+        x,
+        y,
+        text,
+        pdfSize,
+        color,
+        canvasHeight
+    });
+}
+
 ///DECLARED VARIABLES OUT OF LOOP
+let textAnnotations = [];
+
 let originalPdfBuffer = null;
 let planHighlight = null;
 let captHighlight = null;
@@ -1872,6 +1915,10 @@ let windArrowAnnotation = null;
 let crewBulletinAnnotation = null;
 let pageTitleAnnotations = [];
 let notamHighlights = [];
+let intamPdfAnnotations = [];
+const intamAgeAnnotations = [];
+let forecastWaypointHighlights = [];
+const forecastRecommendationAnnotations = [];
 
 let dep = "";
 let arr = "";
@@ -2130,7 +2177,7 @@ fileInput.addEventListener("change", async (e) => {
 
     const results = [];
     let codeList = [];
-    const matches = [];
+    const clbMatches = [];
     let lastCode = null;
 
     for (let p = legsStartPage; p <= legsEndPage; p++) {
@@ -2221,41 +2268,56 @@ fileInput.addEventListener("change", async (e) => {
             }
         }
 
-        // =====================================================
-        // CLB SCHEDULE
-        // =====================================================
+        /// CLB SCHEDULE
+        clbMatches.length = 0;
+        let lastCode = null;
 
-        for (let i = 0; i < tokens.length; i++) {
+        for (let p = legsStartPage; p <= legsEndPage; p++) {
 
-            const token = tokens[i];
+            const pg = pages[p - 1];
+            const tokens = pg.tokens;
 
-            const m = token.match(/\b(\d{3})\s*\.\.\./);
+            for (let i = 0; i < tokens.length; i++) {
 
-            if (!m) continue;
+                const token = tokens[i];
 
-            const code = m[1];
+                const m = token.match(/\b(\d{3})\s*\.\.\.\s*(\d{3})\b/);
 
-            // filter: first digit must be 2, 3, or 4
-            if (!/^[234]/.test(code)) continue;
+                if (!m) continue;
 
-            // only record when code changes
-            if (code === lastCode) continue;
-            lastCode = code;
+                const code = m[1];
+                const track = m[2];  // TRK
 
-            const before5 = tokens[i - 5];
-            if (!before5) continue;
+                // filter: first digit must be 2, 3, or 4
+                if (!/^[234]/.test(code)) continue;
 
-            const waypointBefore =
-                /^\d{3}(?:\.\d)?$/.test(tokens[i - 7] || "")
-                    ? (tokens[i - 9] || null)
-                    : (tokens[i - 7] || null);
+                // only record when code changes
+                if (code === lastCode) continue;
+                lastCode = code;
 
-            matches.push({
-                page: p,
-                code,
-                value: before5.slice(0, 5),
-                waypointBefore
-            });
+                const before5 = tokens[i - 5];
+                if (!before5) continue;
+
+                // Find the waypoint associated with this climb
+                const waypointIndex =
+                    /^\d{3}(?:\.\d)?$/.test(tokens[i - 7] || "")
+                        ? i - 9
+                        : i - 7;
+
+                const waypointBefore = tokens[waypointIndex] || null;
+
+                console.log(
+                    `CLB ${code} | ${before5.slice(0, 5)} | ${waypointBefore} | TRK ${track}`
+                );
+
+                clbMatches.push({
+                    page: p,
+                    code,
+                    track,
+                    value: before5.slice(0, 5),
+                    waypointBefore,
+                });
+            }
         }
     }
 
@@ -2374,13 +2436,13 @@ fileInput.addEventListener("change", async (e) => {
                 if (t.includes("ENTRY")) {
 
                     let airport1 = null;
-                    let airport2 = null;
-                    let airport3 = null;
-                    let airport4 = null;
+                    let airportLast = null;
+                    let middleAirports = [];
 
                     let start = lastTime;
                     let end = null;
 
+                    // Airport immediately before ENTRY
                     for (let j = i - 1; j >= 0; j--) {
                         if (isAirport(tokens[j])) {
                             airport1 = cleanAirport(tokens[j]);
@@ -2388,50 +2450,77 @@ fileInput.addEventListener("change", async (e) => {
                         }
                     }
 
-                    let foundAfterEntry = [];
+                    let airportsBeforeExit = [];
 
+                    // Scan until EXIT
                     for (let k = i + 1; k < tokens.length; k++) {
 
                         const tk = tokens[k];
 
                         if (tk.includes("EXIT")) {
 
-                            let exitEnd = null;
-
+                            // Find exit time
                             for (let j = k - 1; j >= 0; j--) {
                                 if (isEDTOTime(tokens[j])) {
-                                    exitEnd = tokens[j].replace(/\s+/g, "");
+                                    end = tokens[j].replace(/\s+/g, "");
                                     break;
                                 }
                             }
 
-                            end = exitEnd;
+                            // Last airport before EXIT
+                            airportLast = airportsBeforeExit.at(-1) || null;
 
-                            for (let j = k - 1; j >= 0; j--) {
-                                if (isAirport(tokens[j])) {
-                                    airport4 = cleanAirport(tokens[j]);
-                                    break;
-                                }
-                            }
+                            // All airports except the last one
+                            middleAirports = airportsBeforeExit.slice(0, -1);
 
                             break;
                         }
 
                         if (isAirport(tk)) {
-                            foundAfterEntry.push(cleanAirport(tk));
+
+                            const airport = cleanAirport(tk);
+
+                            if (
+                                airport &&
+                                airportsBeforeExit[airportsBeforeExit.length - 1] !== airport
+                            ) {
+                                airportsBeforeExit.push(airport);
+                            }
                         }
                     }
 
-                    airport2 = foundAfterEntry[0] || null;
-                    airport3 = foundAfterEntry[1] || null;
+                    function diffEDTO(start, end) {
+
+                        if (!start || !end) return "-";
+
+                        const [sh, sm] = start.split(".").map(Number);
+                        const [eh, em] = end.split(".").map(Number);
+
+                        let startMin = sh * 60 + sm;
+                        let endMin = eh * 60 + em;
+
+                        // Handle crossing midnight
+                        if (endMin < startMin) {
+                            endMin += 24 * 60;
+                        }
+
+                        const diff = endMin - startMin;
+
+                        const h = Math.floor(diff / 60);
+                        const m = diff % 60;
+
+                        return `${h}h ${m.toString().padStart(2, "0")}m`;
+                    }
+
+                    const duration = diffEDTO(start, end);
 
                     edtoGroups.push({
                         airport1,
-                        airport2,
-                        airport3,
-                        airport4,
+                        middleAirports,
+                        airportLast,
                         start,
-                        end
+                        end,
+                        duration
                     });
                 }
             }
@@ -2453,6 +2542,10 @@ fileInput.addEventListener("change", async (e) => {
 
     function isWP3(t) {
         return /^[A-Z]{3}$/.test(t);
+    }
+
+    function isLatLongWP(t) {
+        return /^\d{2}[NSEW]\d{2}$/.test(t);
     }
 
     function isFIRTime(t) {
@@ -2521,6 +2614,21 @@ fileInput.addEventListener("change", async (e) => {
                     time
                 });
             }
+
+            // =========================
+            // Latitude / Longitude waypoint
+            // =========================
+            if (isLatLongWP(t)) {
+
+                const timeToken = tokens[i + 2] || "";
+                const time = cleanTime(timeToken);
+
+                resultsFIR.push({
+                    type: "LATLONG",
+                    waypoint: t,
+                    time
+                });
+            }
         }
     }
 
@@ -2537,7 +2645,11 @@ fileInput.addEventListener("change", async (e) => {
             firMap.set(r.time, r.fir);
         }
 
-        if (r.type === "WP5" || r.type === "WP3") {
+        if (
+            r.type === "WP5" ||
+            r.type === "WP3" ||
+            r.type === "LATLONG"
+        ) {
             if (!waypointMap.has(r.time)) {
                 waypointMap.set(r.time, []);
             }
@@ -2918,16 +3030,18 @@ for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
         if (match) {
 
             const date = parseIntamDate(match[0]);
+            const daysAgo = daysSinceIntam(date);
 
-            if (isRecentIntam(date)) {
+            const label =
+                daysAgo === 0
+                    ? "TODAY"
+                    : `${daysAgo} day${daysAgo === 1 ? "" : "s"} ago`;
 
-                recentIntamDates.push({
-                    page: p,
-                    item: items[i],
-                    date: match[0]
-                });
-
-            }
+            intamAgeAnnotations.push({
+                page: p - 1,
+                item: items[i],
+                label
+            });
         }
 
         const prevHasEquals = prev.includes("=");
@@ -2940,7 +3054,15 @@ for (let p = crewBulletinStartPage; p <= pdf.numPages; p++) {
     }
 }
 
+function daysSinceIntam(date) {
 
+    const today = new Date();
+
+    today.setHours(0, 0, 0, 0);
+    date.setHours(0, 0, 0, 0);
+
+    return Math.floor((today - date) / (1000 * 60 * 60 * 24));
+}
 
 
 
@@ -4799,8 +4921,20 @@ const highGroundWaypoints = await extractHighGroundWaypoints(fileInput.files[0])
 const profiles = await findDecompressionProfiles(highGroundWaypoints);
 console.log(profiles);
 
+///HELPERS FOR FORECAST WIND PAGES
+function windComponent(track, windDir, windSpeed) {
 
+    let diff = Math.abs(track - windDir);
 
+    if (diff > 180)
+        diff = 360 - diff;
+
+    const radians = diff * Math.PI / 180;
+
+    // Positive = headwind
+    // Negative = tailwind
+    return windSpeed * Math.cos(radians);
+}
 
 
 
@@ -5071,33 +5205,6 @@ for (let i = 0; i < pagesToRender.length; i++) {
                         octx.restore();
                     }
                 }
-            }
-        }
-
-        if (recentIntamDates.length) {
-
-            for (const intam of recentIntamDates) {
-
-                if (intam.page !== pageNum)
-                    continue;
-
-                const t = intam.item.transform;
-
-                const tx = t[4] * scale;
-                const ty = viewport.height - (t[5] * scale);
-
-                octx.save();
-
-                octx.fillStyle = "rgba(255,165,0,0.45)";
-
-                octx.fillRect(
-                    tx,
-                    ty - 12,
-                    intam.item.width * scale,
-                    18
-                );
-
-                octx.restore();
             }
         }
 
@@ -6081,9 +6188,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     "UTAA"
                 ];
 
-                const matchedAirport = wxAirports.find(icao =>
-                    token.includes(icao) && token !== "ADEQUATE"
-                );
+                const matchedAirport = wxAirports.find(icao => token === icao);
 
                 if (matchedAirport) {
 
@@ -6163,8 +6268,269 @@ for (let i = 0; i < pagesToRender.length; i++) {
               }
 
 
-            
-              
+            /// FORECAST WIND PAGE ANNOTATIONS   
+            const clbWaypointSet = new Set(
+                clbMatches
+                    .map(c => c.waypointBefore)
+                    .filter(Boolean)
+            );
+
+            if (
+                forecastStartPage !== null &&
+                pageNum >= forecastStartPage &&
+                pageNum <= forecastStartPage + 2
+            ) {
+
+                const token = (item.str || "").trim().toUpperCase();
+
+                if (clbWaypointSet.has(token)) {
+
+                    const climb = clbMatches.find(c => c.waypointBefore === token);
+
+                    if (!climb) continue; // or continue, depending on your loop structure
+
+                    const t = item.transform;
+
+                    forecastWaypointHighlights.push({
+                        page: pageNum - 1,
+                        x: t[4],
+                        y: t[5],
+                        width: item.width,
+                        height: 18,
+                        token: token
+                    });
+
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
+
+                    octx.save();
+                    octx.fillStyle = "rgba(255,235,59,0.45)";
+                    octx.fillRect(
+                        tx,
+                        ty - 12,
+                        item.width * scale,
+                        18
+                    );
+                    octx.restore();
+
+                    // -------------------------
+                    // Search ahead for the forecast line
+                    // -------------------------
+                    for (let j = i + 1; j < Math.min(i + 5, items.length); j++) {
+
+                        const line = (items[j].str || "").trim();
+
+                        const fields = line.split(/\s+/);
+
+                        // Find the planned FL
+                        const idx = fields.indexOf(climb.code);
+
+                        if (idx === -1) continue;
+
+                        // ============================
+                        // Wind Analysis
+                        // ============================
+
+                        // Planned wind (e.g. 25019)
+                        const plannedWind = fields[idx + 1];
+
+                        const plannedDir = Number(plannedWind.slice(0, 3));
+                        const plannedSpd = Number(plannedWind.slice(3));
+
+                        // Lower level wind
+                        const lowerWind = fields[idx + 4];
+
+                        const lowerDir = Number(lowerWind.slice(0, 3));
+                        const lowerSpd = Number(lowerWind.slice(3));
+
+                        // Aircraft track
+                        const track = Number(climb.track);
+
+                        // Wind components
+                        const plannedComp = windComponent(
+                            track,
+                            plannedDir,
+                            plannedSpd
+                        );
+
+                        const lowerComp = windComponent(
+                            track,
+                            lowerDir,
+                            lowerSpd
+                        );
+
+                        // Difference in headwind (+) / tailwind (-)
+                        const windPenalty = plannedComp - lowerComp;
+
+                        let recommendation;
+
+                        if (windPenalty <= 0) {
+
+                            // Same or better wind at higher level
+                            const tailwindGain = Math.abs(windPenalty);
+
+                            recommendation =
+                                `▲ CLB FL${climb.code} (+${tailwindGain.toFixed(1)}KT TW)`;
+
+                        }
+                        else if (windPenalty < 10) {
+
+                            // Small headwind increase
+                            recommendation = `▲ CLB FL${climb.code} (+${windPenalty.toFixed(1)}KT HW)`;
+
+                        }
+                        else {
+
+                            // Large headwind penalty
+                            recommendation = `▼ STAY FL${fields[idx + 3]} (+${windPenalty.toFixed(1)}KT HW)`;
+
+                        }
+
+                        const tf = items[j].transform;
+
+                        const fx = tf[4] * scale;
+                        const fy = viewport.height - (tf[5] * scale);
+
+                        const charWidth = (items[j].width * scale) / line.length;
+
+                        // ============================
+                        // Highlight 1 : Planned FL + Wind
+                        // ============================
+
+                        const firstText = `${fields[idx]} ${fields[idx + 1]}`;
+
+                        const firstStart = line.indexOf(firstText);
+
+                        const firstX = fx + (firstStart * charWidth);
+                        const firstWidth = firstText.length * charWidth;
+
+                        octx.save();
+
+                        octx.fillStyle = "rgba(255,235,59,0.45)";
+
+                        octx.fillRect(
+                            firstX,
+                            fy - 12,
+                            firstWidth,
+                            18
+                        );
+
+                        octx.restore();
+
+                        forecastWaypointHighlights.push({
+                            page: pageNum - 1,
+                            x: tf[4] + (firstStart * (items[j].width / line.length)),
+                            y: tf[5],
+                            width: items[j].width * (firstText.length / line.length),
+                            height: 18
+                        });
+
+                        // ============================
+                        // Highlight 2 : Next lower FL + Wind
+                        // ============================
+
+                        if (fields[idx + 3] && fields[idx + 4]) {
+
+                            const secondText = `${fields[idx + 3]} ${fields[idx + 4]}`;
+
+                            const secondStart = line.indexOf(secondText);
+
+                            const secondX = fx + (secondStart * charWidth);
+                            const secondWidth = secondText.length * charWidth;
+
+                            octx.save();
+
+                            octx.fillStyle = "rgba(255,235,59,0.45)";
+
+                            octx.fillRect(
+                                secondX,
+                                fy - 12,
+                                secondWidth,
+                                18
+                            );
+
+                            octx.restore();
+
+                            forecastWaypointHighlights.push({
+                                page: pageNum - 1,
+                                x: tf[4] + (secondStart * (items[j].width / line.length)),
+                                y: tf[5],
+                                width: items[j].width * (secondText.length / line.length),
+                                height: 18
+                            });
+                        }
+
+                        // ============================
+                        // Highlight Tropopause
+                        // ============================
+
+                        if (items[j + 2]) {
+
+                            const tropItem = items[j + 2];
+                            const tt = tropItem.transform;
+
+                            const tx = tt[4] * scale;
+                            const ty = viewport.height - (tt[5] * scale);
+
+                            octx.save();
+
+                            octx.fillStyle = "rgba(255,235,59,0.45)";
+
+                            octx.fillRect(
+                                tx,
+                                ty - 12,
+                                tropItem.width * scale,
+                                18
+                            );
+
+                            octx.restore();
+
+                            forecastWaypointHighlights.push({
+                                page: pageNum - 1,
+                                x: tt[4],
+                                y: tt[5],
+                                width: tropItem.width,
+                                height: 18
+                            });
+                        }
+
+                        // ============================
+                        // Recommendation annotation
+                        // ============================
+
+                        const recX = fx + (items[j].width * scale) + 60;
+
+                        octx.save();
+
+                        octx.font = "10px Helvetica";
+                        octx.fillStyle =
+                            recommendation.startsWith("▲")
+                                ? "green"
+                                : "red";
+
+                        octx.fillText(
+                            recommendation,
+                            recX,
+                            fy
+                        );
+
+                        octx.restore();
+
+                        forecastRecommendationAnnotations.push({
+                            page: pageNum - 1,
+                            text: recommendation,
+                            x: tf[4] + items[j].width + 40,
+                            y: tf[5],
+                            color:
+                                recommendation.startsWith("▲")
+                                    ? PDFLib.rgb(0, 0.6, 0)
+                                    : PDFLib.rgb(1, 0, 0)
+                        });
+
+                        break;
+                    }
+                }
+            }
             ///NEXT
 
 
@@ -6210,6 +6576,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
         /// VWS Annotation
         if (pageNum === 1) {
+            console.log("Matches in annotation:", clbMatches.length);
 
             let lines = [];
 
@@ -6224,7 +6591,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
             lines.push("");
             lines.push("CLB SCHED:");
 
-            for (const m of matches) {
+            for (const m of clbMatches) {
+
+                console.log(m);
+
                 lines.push(
                     `FL${m.code} : ${m.value} ${m.waypointBefore}`
                 );
@@ -6510,12 +6880,20 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 for (const g of edtoGroups) {
 
                     lines.push("EDTO:");
-                    lines.push(`A1: ${g.airport1 || "-"}`);
+                    lines.push(`ENTRY: ${g.airport1 || "-"}`);
                     lines.push(`${g.start || "-"}`);
-                    lines.push(`A2: ${g.airport2 || "-"}`);
-                    lines.push(`A3: ${g.airport3 || "-"}`);
+
+                    if (g.middleAirports.length) {
+                        g.middleAirports.forEach((airport, index) => {
+                            lines.push(`A${index + 1}: ${airport}`);
+                        });
+                    } else {
+                        lines.push("A1: -");
+                    }
+
                     lines.push(`${g.end || "-"}`);
-                    lines.push(`A4: ${g.airport4 || "-"}`);
+                    lines.push(`EXIT: ${g.airportLast || "-"}`);
+                    lines.push(`${g.duration}`);
                     lines.push("");
                 }
             }
@@ -7055,27 +7433,65 @@ for (let i = 0; i < pagesToRender.length; i++) {
         }
 
         // INTAMS
-        if (pageNum === crewBulletinStartPage) {
+        if (pageNum >= crewBulletinStartPage) {
 
-            intamTitleAnnotation = {
-                page: crewBulletinStartPage - 1,
-                text: "INTAMS",
-                x: 20,
-                y: 50,
-                canvasHeight: octx.canvas.height
-            };
+            // Draw title only on first bulletin page
+            if (pageNum === crewBulletinStartPage) {
 
-            octx.save();
+                intamTitleAnnotation = {
+                    page: crewBulletinStartPage - 1,
+                    text: "INTAMS",
+                    x: 20,
+                    y: 50,
+                    canvasHeight: octx.canvas.height
+                };
 
-            octx.font = "bold 36px Arial";
-            octx.fillStyle = "rgba(255, 0, 0, 0.9)";
-            octx.fillText(
-                "INTAMS",
-                20,
-                50
-            );
+                octx.save();
 
-            octx.restore();
+                octx.font = "bold 36px Arial";
+                octx.fillStyle = "rgba(255, 0, 0, 0.9)";
+                octx.fillText(
+                    "INTAMS",
+                    20,
+                    50
+                );
+
+                octx.restore();
+            }
+
+            // Draw "X days ago" beside each INTAM date
+            for (const a of intamAgeAnnotations) {
+
+                if (a.page !== pageNum - 1) continue;
+
+                const t = a.item.transform;
+
+                const tx = t[4] * scale;
+                const ty = viewport.height - (t[5] * scale);
+
+                const textWidth = a.item.width * scale;
+
+                intamPdfAnnotations.push({
+                    page: pageNum - 1,
+                    text: a.label,
+                    x: tx + textWidth + 8,
+                    y: ty,
+                    canvasHeight: octx.canvas.height
+                });
+
+                octx.save();
+
+                octx.font = "11px Helvetica";
+                octx.fillStyle = "blue";
+
+                octx.fillText(
+                    a.label,
+                    tx + textWidth + 8,
+                    ty
+                );
+
+                octx.restore();
+            }
         }
 
 
@@ -7147,8 +7563,6 @@ for (let i = 0; i < pagesToRender.length; i++) {
             tocY += 18;
         }
     }
-
-
 
 
 
@@ -7939,10 +8353,42 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
         }
     }
 
+    // INTAM age labels
+        for (const a of intamPdfAnnotations) {
 
+            const page = pdfPages[a.page];
 
+            page.drawText(
+                a.text,
+                {
+                    x: a.x / scale,
+                    y: (a.canvasHeight - a.y) / scale,
+                    size: 8,
+                    font: unicodeFont,
+                    color: PDFLib.rgb(0, 0, 1)
+                }
+            );
+        }
 
+    for (const h of forecastWaypointHighlights) {
+        drawForecastHighlight(
+            pdfPages[h.page],
+            h
+        );
+    }
 
+    for (const a of forecastRecommendationAnnotations) {
+
+        const page = pdfPages[a.page];
+
+        page.drawText(a.text, {
+            x: a.x,
+            y: a.y,
+            size: 8,
+            font: unicodeFont,
+            color: a.color
+        });
+    }
 
 
 
