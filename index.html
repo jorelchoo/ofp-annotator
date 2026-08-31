@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v2.0</h2>
+    <h2>OFP Annotation Tool v2.1</h2>
 </div>
 
 <div class="upload">
@@ -1919,6 +1919,13 @@ let intamPdfAnnotations = [];
 const intamAgeAnnotations = [];
 let forecastWaypointHighlights = [];
 const forecastRecommendationAnnotations = [];
+const legsWaypointMatches = [];
+
+let currentWxAirport = null;
+let currentWxHasBad = false;
+let currentWxAirportHeader = null;
+const badWxAirports = [];
+let badWxHighlights = [];
 
 let dep = "";
 let arr = "";
@@ -1950,6 +1957,7 @@ let intamTitleAnnotation = null;
 let bulletinAnnotation = null;
 let tocAnnotation = null;
 
+let waypoints = [];
 let extractedNotams = [];
 let notamDepTime = null;
 let notamArrTime = null;
@@ -2166,13 +2174,32 @@ fileInput.addEventListener("change", async (e) => {
 
     }
 
-
+    console.log("WX PAGE RANGE:", {
+        airportWxStartPage,
+        airportWxEndPage
+    });
 
     ///LEGS EXTRACTION (VWS + HIGH GROUND + CLB)
     const targetSet = new Set([
         "004","005","006","007","008","009",
         "010","011","012","013","014","015",
         "016","017","018","019"
+    ]);
+
+    const waypointBlacklist = new Set([
+        // Add anything here that looks like a waypoint
+        // but isn't actually one.
+        "CLB",
+        "DSC",
+        "UTC",
+        "TAS",
+        "GS",
+        "TRK",
+        "WIND",
+        "COORD",
+        "FO",
+        "TOC",
+        "PCT"
     ]);
 
     const results = [];
@@ -2268,6 +2295,74 @@ fileInput.addEventListener("change", async (e) => {
             }
         }
 
+        // =================================================
+        // WAYPOINT + TRK EXTRACTION
+        // ================================================
+        for (let i = 0; i < tokens.length; i++) {
+
+            const token = tokens[i];
+
+            if (waypointBlacklist.has(token)) {
+                continue;
+            }
+
+            if (
+                /^(?:[A-Z]{2}|[A-Z]{3}|[A-Z]{5})$/.test(token) ||
+                /^\d{2}[NSEW]\d{2}$/.test(token)
+            ) {
+
+                let trkToken = null;
+                let track = null;
+                let flightLevel = null;
+
+                // =================================================
+                // SEARCH NEXT 10 TOKENS FOR "FL ... TRK"
+                // =================================================
+
+                for (
+                    let j = i + 1;
+                    j <= Math.min(i + 10, tokens.length - 1);
+                    j++
+                ) {
+
+                    const searchToken = (tokens[j] || "").trim();
+
+                    const match =
+                        searchToken.match(/(\d{3})\s*\.\.\.\s*(\d{3})\b/);
+
+                    if (!match) {
+                        continue;
+                    }
+
+                    const flNumber = Number(match[1]);
+                    const trackNumber = Number(match[2]);
+
+                    if (trackNumber < 0 || trackNumber > 360) {
+                        continue;
+                    }
+
+                    flightLevel = match[1];
+                    track = match[2];
+                    trkToken = searchToken;
+
+                    break;
+                }
+
+                console.log(
+                    `WAYPOINT: ${token} | FL: ${flightLevel} | TRK TOKEN: ${trkToken} | TRK: ${track} | PAGE: ${p}`
+                );
+
+                legsWaypointMatches.push({
+                    page: p,
+                    waypoint: token,
+                    index: i,
+                    flightLevel,
+                    trkToken,
+                    track
+                });
+            }
+        }
+
         /// CLB SCHEDULE
         clbMatches.length = 0;
         let lastCode = null;
@@ -2319,6 +2414,12 @@ fileInput.addEventListener("change", async (e) => {
                 });
             }
         }
+
+    console.log(
+        "ALL LEGS WAYPOINT/TRK:",
+        legsWaypointMatches
+        );
+
     }
 
     const highGroundSummary = summarizeTimeRanges(
@@ -4557,7 +4658,7 @@ async function extractHighGroundWaypoints(ofpFile){
         data: await ofpFile.arrayBuffer()
     }).promise;
 
-    const waypoints = [];
+    
     const seen = new Set();
 
     // Keep every page's token list so we can search it later
@@ -4680,236 +4781,720 @@ async function extractHighGroundWaypoints(ofpFile){
 
 }
 
-//=====================================================
-// FIND DECOMPRESSION PROFILES
-//=====================================================
+/// extract airways from page 1
+function extractAirways(){
 
-async function findDecompressionProfiles(highGroundWaypoints){
+    const airways = [];
+    const seen = new Set();
+
+    const pg = pages[0];
+
+    if(!pg){
+        console.error("Page 1 does not exist");
+        return airways;
+    }
+
+    // Get Page 1 text
+    let text = pg.text || "";
+
+    // Stop searching once SCHED DEP is reached
+    const schedDepIndex = text.indexOf("SCHED DEP");
+
+    if(schedDepIndex !== -1){
+        text = text.substring(0, schedDepIndex);
+    }
+
+    const tokens = text
+        .split(/\s+/)
+        .filter(Boolean);
+
+    for(const token of tokens){
+
+        const airway = token
+            .trim()
+            .toUpperCase()
+            .replace(/[.,]$/, "");
+
+        // Airway formats:
+        // Q1
+        // M11
+        // L750
+        // UM11
+        // UL746
+        if(/^[A-Z]{1,2}\d{1,3}$/.test(airway)){
+
+            if(!seen.has(airway)){
+
+                seen.add(airway);
+                airways.push(airway);
+
+            }
+        }
+    }
+
+    console.log("Airways extracted from Page 1:");
+    console.log(airways);
+
+    return airways;
+}
+
+async function findDecompressionProfiles(highGroundWaypoints, airways){
 
     const PDF_PATH = "./decompression_profiles.pdf";
+
     const START_PAGE = 13;
     const END_PAGE = 30;
 
     const pdf = await pdfjsLib.getDocument(PDF_PATH).promise;
 
     const matches = [];
-    const candidateRoutes = [];
 
-    //--------------------------------------------------
-    // Helpers
-    //--------------------------------------------------
 
-    function isRoute(token){
+    /// EXTRACT DECOMPRESSION PDF PAGES
+    const decompressionPages = [];
 
-        return /^[A-Z0-9]{2,6}\s+TO\s+[A-Z0-9]{2,6}$/.test(token);
+    for(let p = START_PAGE; p <= END_PAGE; p++){
 
-    }
+        const page = await pdf.getPage(p);
 
-    function isProfile(token){
+        const content = await page.getTextContent();
 
-        return (
-            /^[A-Z]{3,6}$/.test(token) ||
-            /^[A-Z]{3,6}\s*\(\d+\)$/.test(token)
-        );
+        const tokens = content.items
+            .map(item => item.str.trim())
+            .filter(Boolean);
 
-    }
-
-    function isAirway(token){
-
-        return (
-            token.includes("DCT") ||
-            token.includes(",") ||
-            /\b[A-Z]\d{2,3}\b/.test(token)
-        );
+        decompressionPages.push({
+            page: p,
+            tokens: tokens
+        });
 
     }
 
-    function profileMatchesWaypoint(profile, highGroundWaypoints){
+    console.log(
+        "Decompression profile pages extracted:",
+        decompressionPages.length
+    );
 
-        const profileName =
-            profile.replace(/\s*\(\d+\)$/, "");
 
-        return highGroundWaypoints.includes(profileName);
-
-    }
-
+    /// HELPERS
     function profileBaseName(profile){
 
-        return profile.replace(/\s*\(\d+\)$/, "");
+        return profile
+            .replace(/\s*\(\d+\)$/, "")
+            .trim();
 
     }
 
-    //--------------------------------------------------
-    // PRIMARY ROUTE MATCH
-    //--------------------------------------------------
+    /// PRIMARY ROUTE MATCH
+    for(const pg of decompressionPages){
 
-    let waitingForProfile = false;
-    let currentRoute = "";
+        const tokens = pg.tokens;
 
-    for (let p = START_PAGE; p <= END_PAGE; p++) {
+        for(let i = 0; i < tokens.length; i++){
 
-        const pg = pages[p - 1];
+            const routeToken = tokens[i];
 
-        const tokens = pg.tokens.filter(Boolean);
+            /// 1. CHECK FOR ROUTE TOKEN
+            const routeMatch =
+                routeToken.match(
+                    /^([A-Z0-9]{2,6})\s+TO\s+([A-Z0-9]{2,6})$/
+                );
 
-        for(const token of tokens){
+            if(!routeMatch)
+                continue;
 
-            if(waitingForProfile){
+            const startWaypoint = routeMatch[1];
+            const endWaypoint = routeMatch[2];
 
-                if(isAirway(token))
-                    continue;
+            /// 2. CHECK WHETHER EITHER END IS A HIGH GROUND WAYPOINT
+            const startIsHighGround =
+                highGroundWaypoints.includes(startWaypoint);
 
-                if(isProfile(token)){
+            const endIsHighGround =
+                highGroundWaypoints.includes(endWaypoint);
 
-                    matches.push({
-                        route: currentRoute,
-                        profile: token,
-                        method: "ROUTE"
-                    });
+            if(!startIsHighGround && !endIsHighGround)
+                continue;
 
-                    const r = candidateRoutes.find(
-                        x => x.route === currentRoute
+            /// 3. IDENTIFY THE HIGH GROUND WAYPOINT
+            const highGroundWaypoint =
+                startIsHighGround
+                    ? startWaypoint
+                    : endWaypoint;
+
+            console.log(
+                `HIGH GROUND ROUTE FOUND [P${pg.page}]:`,
+                routeToken
+            );
+
+            console.log(
+                "  HIGH GROUND WAYPOINT:",
+                highGroundWaypoint
+            );
+
+            /// 4. START LOOKING AT TOKENS AFTER ROUTE
+            let airwayIndex = i + 1;
+
+            const matchedAirways = [];
+            const airwayTokens = [];
+
+            let foundAtLeastOneAirway = false;
+
+            /// 5. KEEP CONSUMING AIRWAY / DCT TOKENS
+            while(airwayIndex < tokens.length){
+
+                const currentToken = tokens[airwayIndex];
+
+                //--------------------------------------------------
+                // CHECK WHETHER THIS TOKEN IS STRUCTURALLY AN
+                // AIRWAY / DCT TOKEN
+                //--------------------------------------------------
+
+                const containsDCT =
+                    currentToken.includes("DCT");
+
+                //--------------------------------------------------
+                // Split comma/slash separated entries and check
+                // each entry for valid airway format
+                //--------------------------------------------------
+
+                const tokenEntries = currentToken
+                    .split(/[,/]/)
+                    .map(x => x.trim())
+                    .filter(Boolean);
+
+                const containsAirwayFormat =
+                    tokenEntries.some(
+                        airway =>
+                            /^[A-Z]{1,2}\d{1,3}$/.test(airway)
                     );
 
-                    if(r)
-                        r.found = true;
+                //--------------------------------------------------
+                // IF IT IS NOT DCT AND DOES NOT LOOK LIKE AN AIRWAY
+                // THEN THIS TOKEN IS THE PROFILE
+                //--------------------------------------------------
 
-                    waitingForProfile = false;
-                    currentRoute = "";
+                if(!containsDCT && !containsAirwayFormat){
+
+                    console.log(
+                        "  PROFILE TOKEN FOUND:",
+                        currentToken
+                    );
+
+                    break;
+                }
+
+                //--------------------------------------------------
+                // THIS IS AN AIRWAY / DCT TOKEN
+                //--------------------------------------------------
+
+                console.log(
+                    "  CHECKING AIRWAY TOKEN:",
+                    currentToken
+                );
+
+                console.log(
+                    "    STRUCTURE:",
+                    containsDCT
+                        ? "DCT"
+                        : "AIRWAY"
+                );
+
+                //--------------------------------------------------
+                // FIND OFP AIRWAYS IN THIS TOKEN
+                //--------------------------------------------------
+
+                const matchedTokenAirways =
+                    airways.filter(
+                        airway =>
+                            currentToken.includes(airway)
+                    );
+
+                console.log(
+                    "    OFP AIRWAY MATCHES:",
+                    matchedTokenAirways
+                );
+
+                //--------------------------------------------------
+                // IF DCT IS PRESENT, ALSO LOOK FOR HIGH GROUND
+                // WAYPOINTS IN THIS TOKEN
+                //--------------------------------------------------
+
+                const matchedTokenWaypoints =
+                    containsDCT
+                        ? highGroundWaypoints.filter(
+                            waypoint =>
+                                currentToken.includes(waypoint)
+                        )
+                        : [];
+
+                if(containsDCT){
+
+                    console.log(
+                        "    DCT PRESENT → HIGH GROUND MATCHES:",
+                        matchedTokenWaypoints
+                    );
 
                 }
 
-                continue;
+                //--------------------------------------------------
+                // ACCEPT TOKEN IF:
+                //
+                // - It contains an OFP airway
+                // OR
+                // - It contains DCT + a high-ground waypoint
+                //--------------------------------------------------
 
-            }
+                const validToken =
+                    matchedTokenAirways.length > 0 ||
+                    matchedTokenWaypoints.length > 0;
 
-            if(!isRoute(token))
-                continue;
+                if(validToken){
 
-            const [start,,end] = token.split(/\s+/);
+                    foundAtLeastOneAirway = true;
 
-            const startIndex =
-                highGroundWaypoints.indexOf(start);
+                    airwayTokens.push(currentToken);
 
-            const endIndex =
-                highGroundWaypoints.indexOf(end);
+                    //--------------------------------------------------
+                    // SAVE AIRWAY MATCHES
+                    //--------------------------------------------------
 
-            if(
-                startIndex !== -1 &&
-                endIndex !== -1 &&
-                startIndex < endIndex
-            ){
+                    matchedTokenAirways.forEach(airway => {
 
-                console.log("Route Match:", token);
+                        if(!matchedAirways.includes(airway)){
 
-                currentRoute = token;
+                            matchedAirways.push(airway);
 
-                candidateRoutes.push({
-                    route: token,
-                    found: false
-                });
+                        }
 
-                waitingForProfile = true;
+                    });
 
-            }
+                    //--------------------------------------------------
+                    // SAVE DCT WAYPOINT MATCHES
+                    //--------------------------------------------------
 
-        }
+                    matchedTokenWaypoints.forEach(waypoint => {
 
-    }
+                        const dctWaypoint =
+                            `DCT ${waypoint}`;
 
-    //--------------------------------------------------
-    // FALLBACK PROFILE MATCH
-    //--------------------------------------------------
+                        if(!matchedAirways.includes(dctWaypoint)){
 
-    for (let p = START_PAGE; p <= END_PAGE; p++) {
+                            matchedAirways.push(
+                                dctWaypoint
+                            );
 
-        const pg = pages[p - 1];
+                        }
 
-        const tokens = pg.tokens.filter(Boolean);
+                    });
 
-        let lastRoute = null;
+                    console.log(
+                        "    → VALID AIRWAY/DCT TOKEN"
+                    );
 
-        for(const token of tokens){
+                    airwayIndex++;
 
-            if(isRoute(token)){
-                lastRoute = token;
-                continue;
-            }
+                    continue;
+                }
 
-            if(!isProfile(token))
-                continue;
+                //--------------------------------------------------
+                // TOKEN LOOKS LIKE AIRWAY / DCT BUT DOES NOT
+                // MATCH OUR OFP
+                //
+                // Therefore ignore this entire route.
+                //--------------------------------------------------
 
-            if(!lastRoute)
-                continue;
-
-            if(!profileMatchesWaypoint(
-                token,
-                highGroundWaypoints
-            ))
-                continue;
-
-            const [start,,end] =
-                lastRoute.split(/\s+/);
-
-            const endpointMatches =
-                highGroundWaypoints.includes(start) ||
-                highGroundWaypoints.includes(end);
-
-            if(!endpointMatches)
-                continue;
-
-            const alreadyExists =
-                matches.some(m =>
-                    profileBaseName(m.profile) ===
-                    profileBaseName(token)
+                console.log(
+                    "    → AIRWAY/DCT TOKEN BUT NO OFP MATCH"
                 );
 
-            if(alreadyExists)
+                console.log(
+                    "    → IGNORING ROUTE"
+                );
+
+                foundAtLeastOneAirway = false;
+
+                break;
+            }
+
+            //--------------------------------------------------
+            // ROUTE WAS ABANDONED
+            //--------------------------------------------------
+
+            if(!foundAtLeastOneAirway)
                 continue;
+
+            //--------------------------------------------------
+            // PROFILE = FIRST TOKEN THAT DID NOT LOOK LIKE
+            // AN AIRWAY / DCT TOKEN
+            //--------------------------------------------------
+
+            const profile = tokens[airwayIndex];
+
+            if(!profile){
+
+                console.log(
+                    "  PROFILE: NONE"
+                );
+
+                continue;
+            }
+
+            console.log(
+                "  PROFILE:",
+                profile
+            );
+
+            //--------------------------------------------------
+            // 8. SAVE MATCH
+            //--------------------------------------------------
 
             matches.push({
 
-                route: lastRoute,
-                profile: token,
-                method: "PROFILE"
+                route: routeToken,
+
+                waypoint: highGroundWaypoint,
+
+                airway: matchedAirways.join(", "),
+
+                airwayTokens: airwayTokens,
+
+                profile: profile,
+
+                page: pg.page,
+
+                method: "ROUTE"
 
             });
 
             console.log(
-                "Fallback Match:",
-                lastRoute,
-                "=>",
-                token
+                "  >>> DECOMPRESSION MATCH <<<"
             );
-
         }
 
     }
 
     //--------------------------------------------------
-    // CHART NOT FOUND
+    // FILTER MATCHES
+    //
+    // For each high-ground waypoint, keep only the
+    // profile(s) with the highest number of airway matches.
     //--------------------------------------------------
 
-    for(const r of candidateRoutes){
+    const filteredMatches = [];
 
-        const exists =
-            matches.some(
-                m => m.route === r.route
+    const matchesByWaypoint = new Map();
+
+    //--------------------------------------------------
+    // GROUP MATCHES BY WAYPOINT
+    //--------------------------------------------------
+
+    for(const match of matches){
+
+        if(!matchesByWaypoint.has(match.waypoint)){
+
+            matchesByWaypoint.set(
+                match.waypoint,
+                []
             );
 
-        if(!exists){
+        }
 
-            matches.push({
+        matchesByWaypoint
+            .get(match.waypoint)
+            .push(match);
 
-                route: r.route,
-                profile: "Chart not found",
-                method: "NOT_FOUND"
+    }
+
+    //--------------------------------------------------
+    // FILTER EACH WAYPOINT
+    //--------------------------------------------------
+
+    for(const [waypoint, waypointMatches] of matchesByWaypoint){
+
+        //--------------------------------------------------
+        // Calculate airway count directly from the
+        // airway field
+        //--------------------------------------------------
+
+        for(const match of waypointMatches){
+
+            if(!match.airway){
+
+                match.airwayCount = 0;
+
+                continue;
+            }
+
+            match.airwayCount =
+                match.airway
+                    .split(",")
+                    .map(x => x.trim())
+                    .filter(Boolean)
+                    .length;
+
+        }
+
+        //--------------------------------------------------
+        // Find highest airway count
+        //--------------------------------------------------
+
+        const highestAirwayCount =
+            Math.max(
+                ...waypointMatches.map(
+                    match => match.airwayCount
+                )
+            );
+
+        //--------------------------------------------------
+        // Keep only highest-count matches
+        //--------------------------------------------------
+
+        const bestMatches =
+            waypointMatches.filter(
+                match =>
+                    match.airwayCount ===
+                    highestAirwayCount
+            );
+
+        //--------------------------------------------------
+        // DEBUG
+        //--------------------------------------------------
+
+        console.log(
+            `FILTERING WAYPOINT: ${waypoint}`
+        );
+
+        console.log(
+            "  ALL MATCHES:"
+        );
+
+        waypointMatches.forEach(match => {
+
+            console.log(
+                "   ",
+                match.profile,
+                "→",
+                match.airway,
+                "→ airway count:",
+                match.airwayCount
+            );
+
+        });
+
+        console.log(
+            "  HIGHEST AIRWAY COUNT:",
+            highestAirwayCount
+        );
+
+        console.log(
+            "  KEEPING:",
+            bestMatches.map(
+                match => match.profile
+            )
+        );
+
+        //--------------------------------------------------
+        // Add best matches
+        //--------------------------------------------------
+
+        filteredMatches.push(
+            ...bestMatches
+        );
+
+    }
+
+    //--------------------------------------------------
+    // FILTER 2 - PROFILE NAME / HIGH GROUND WAYPOINT
+    //
+    // If multiple profiles remain for the same waypoint,
+    // keep only profiles whose profile name contains a
+    // high-ground waypoint.
+    //
+    // If no remaining profiles contain a high-ground
+    // waypoint, do not apply this filter.
+    //--------------------------------------------------
+
+    const finalMatches = [];
+
+    const filteredByWaypoint = new Map();
+
+    //--------------------------------------------------
+    // GROUP AIRWAY-FILTERED MATCHES BY WAYPOINT
+    //--------------------------------------------------
+
+    for(const match of filteredMatches){
+
+        if(!filteredByWaypoint.has(match.waypoint)){
+
+            filteredByWaypoint.set(
+                match.waypoint,
+                []
+            );
+
+        }
+
+        filteredByWaypoint
+            .get(match.waypoint)
+            .push(match);
+
+    }
+
+    //--------------------------------------------------
+    // APPLY PROFILE NAME FILTER
+    //--------------------------------------------------
+
+    for(const [waypoint, waypointMatches] of filteredByWaypoint){
+
+        //--------------------------------------------------
+        // If only one profile remains, keep it
+        //--------------------------------------------------
+
+        if(waypointMatches.length === 1){
+
+            finalMatches.push(
+                waypointMatches[0]
+            );
+
+            continue;
+        }
+
+        //--------------------------------------------------
+        // Check whether each profile contains a
+        // high-ground waypoint
+        //--------------------------------------------------
+
+        const profileMatches =
+            waypointMatches.filter(match => {
+
+                if(!match.profile)
+                    return false;
+
+                return highGroundWaypoints.some(
+                    highGroundWaypoint =>
+                        match.profile.includes(
+                            highGroundWaypoint
+                        )
+                );
 
             });
 
+        //--------------------------------------------------
+        // If at least one profile matches a high-ground
+        // waypoint, keep ONLY those profiles
+        //--------------------------------------------------
+
+        if(profileMatches.length > 0){
+
+            console.log(
+                `PROFILE NAME FILTER [${waypoint}]`
+            );
+
+            console.log(
+                "  BEFORE:",
+                waypointMatches.map(
+                    match => match.profile
+                )
+            );
+
+            console.log(
+                "  PROFILE/HIGH-GROUND MATCH:",
+                profileMatches.map(
+                    match => match.profile
+                )
+            );
+
+            finalMatches.push(
+                ...profileMatches
+            );
+
+        } else {
+
+            //--------------------------------------------------
+            // No profiles matched a high-ground waypoint.
+            // Therefore DO NOT apply this filter.
+            //--------------------------------------------------
+
+            console.log(
+                `PROFILE NAME FILTER [${waypoint}]:`
+            );
+
+            console.log(
+                "  No profile names contain a high-ground waypoint."
+            );
+
+            console.log(
+                "  Keeping all existing profiles."
+            );
+
+            finalMatches.push(
+                ...waypointMatches
+            );
+
         }
 
     }
+
+    //--------------------------------------------------
+    // FILTER 3 - REMOVE DUPLICATE PROFILES
+    //
+    // If the same profile appears more than once,
+    // keep only the first occurrence.
+    //--------------------------------------------------
+
+    const uniqueMatches = [];
+    const seenProfiles = new Set();
+
+    for(const match of finalMatches){
+
+        if(!match.profile)
+            continue;
+
+        //--------------------------------------------------
+        // Duplicate profile
+        //--------------------------------------------------
+
+        if(seenProfiles.has(match.profile)){
+
+            console.log(
+                "DUPLICATE PROFILE REMOVED:",
+                match.profile,
+                "from route:",
+                match.route
+            );
+
+            continue;
+        }
+
+        //--------------------------------------------------
+        // First occurrence
+        //--------------------------------------------------
+
+        seenProfiles.add(match.profile);
+
+        uniqueMatches.push(match);
+
+    }
+
+    //--------------------------------------------------
+    // FINAL RESULTS
+    //--------------------------------------------------
+
+    console.log(
+        "FINAL UNIQUE DECOMPRESSION PROFILES:"
+    );
+
+    console.log(uniqueMatches);
+
+    return uniqueMatches;
+
+    //--------------------------------------------------
+    // FINAL RESULTS
+    //--------------------------------------------------
+
+    console.log(
+        "DECOMPRESSION PROFILE MATCHES:"
+    );
 
     console.log(matches);
 
@@ -4917,9 +5502,21 @@ async function findDecompressionProfiles(highGroundWaypoints){
 
 }
 
-const highGroundWaypoints = await extractHighGroundWaypoints(fileInput.files[0]);
-const profiles = await findDecompressionProfiles(highGroundWaypoints);
-console.log(profiles);
+const highGroundWaypoints =
+    await extractHighGroundWaypoints(fileInput.files[0]);
+
+const airways =
+    extractAirways();
+
+const profiles =
+    await findDecompressionProfiles(
+        highGroundWaypoints,
+        airways
+    );
+
+console.log("High Ground Waypoints:", highGroundWaypoints);
+console.log("Airways:", airways);
+console.log("Profiles:", profiles);
 
 ///HELPERS FOR FORECAST WIND PAGES
 function windComponent(track, windDir, windSpeed) {
@@ -6164,66 +6761,338 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     octx.restore();
                 }
             }
-            ///HIGH GROUND AIRPORT WX HIGHLIGHTS
+
+            ///ALL AIRPORTS WX HIGHLIGHTS
+
             if (
                 airportWxStartPage !== null &&
                 airportWxEndPage !== null &&
                 pageNum >= airportWxStartPage &&
                 pageNum <= airportWxEndPage &&
-                codeList.length > 0
+                waypoints.length > 0
             ) {
+
+                console.log("PROCESSING WX PAGE:", pageNum);
 
                 const token = (item.str || "").trim().toUpperCase();
 
-                const wxAirports = [
-                    "VIDP",
-                    "VAAH",
-                    "LTFM",
-                    "LTAC",
-                    "LOWW",
-                    "UBBB",
-                    "UATE",
-                    "OIMM",
-                    "UZTT",
-                    "UTAA"
-                ];
+                if (!token) continue;
 
-                const matchedAirport = wxAirports.find(icao => token === icao);
+                //--------------------------------------------------
+                // CHECK IF THIS IS THE START OF A NEW AIRPORT
+                //--------------------------------------------------
+
+                const airportMatch = token.match(/^([A-Z]{4})\//);
+
+                const matchedAirport = airportMatch
+                    ? airportMatch[1]
+                    : null;
 
                 if (matchedAirport) {
 
-                    const t = item.transform;
+                    //--------------------------------------------------
+                    // FINISH PREVIOUS AIRPORT
+                    //--------------------------------------------------
 
-                        highGroundWxHighlights.push({
-                            page: pageNum - 1,
-                            transform: t,
-                            token: token,
-                            text: matchedAirport,
-                            startIndex: token.indexOf(matchedAirport),
-                            itemWidth: item.width
-                        });
+                    if (currentWxAirport) {
 
-                    const tx = t[4] * scale;
-                    const ty = viewport.height - (t[5] * scale);
+                        if (currentWxHasBad) {
 
-                    const startIndex = token.indexOf(matchedAirport);
+                            if (!badWxAirports.includes(currentWxAirport)) {
+                                badWxAirports.push(currentWxAirport);
+                            }
 
-                    const charWidth = (item.width * scale) / token.length;
+                            //--------------------------------------------------
+                            // HIGHLIGHT PREVIOUS AIRPORT CODE
+                            //--------------------------------------------------
 
-                    const highlightX = tx + (startIndex * charWidth);
+                            if (currentWxAirportHeader) {
 
-                    octx.save();
+                                const t =
+                                    currentWxAirportHeader.transform;
 
-                    octx.fillStyle = "rgba(255, 235, 59, 0.5)";
+                                const headerToken =
+                                    currentWxAirportHeader.token;
 
-                    octx.fillRect(
-                        highlightX,
-                        ty - 12,
-                        charWidth * matchedAirport.length,
-                        18
+                                const tx =
+                                    t[4] * currentWxAirportHeader.scale;
+
+                                const ty =
+                                    currentWxAirportHeader.viewportHeight -
+                                    (t[5] * currentWxAirportHeader.scale);
+
+                                const charWidth =
+                                    (
+                                        currentWxAirportHeader.itemWidth *
+                                        currentWxAirportHeader.scale
+                                    ) / headerToken.length;
+
+                                const startIndex =
+                                    headerToken.indexOf(currentWxAirport);
+
+                                const highlightX =
+                                    tx + (startIndex * charWidth);
+
+                                octx.save();
+
+                                octx.fillStyle =
+                                    "rgba(255, 235, 59, 0.5)";
+
+                                octx.fillRect(
+                                    highlightX,
+                                    ty - 12,
+                                    charWidth * currentWxAirport.length,
+                                    18
+                                );
+
+                                octx.restore();
+
+                                highGroundWxHighlights.push({
+                                    page: currentWxAirportHeader.page,
+                                    transform: t,
+                                    token: headerToken,
+                                    text: currentWxAirport,
+                                    startIndex: startIndex,
+                                    itemWidth: currentWxAirportHeader.itemWidth
+                                });
+                            }
+                        }
+                    }
+
+                    //--------------------------------------------------
+                    // START NEW AIRPORT
+                    //--------------------------------------------------
+
+                    currentWxAirport = matchedAirport;
+                    currentWxHasBad = false;
+
+                    //--------------------------------------------------
+                    // SAVE AIRPORT HEADER INFORMATION
+                    // DON'T HIGHLIGHT YET
+                    //--------------------------------------------------
+
+                    currentWxAirportHeader = {
+                        page: pageNum - 1,
+                        transform: item.transform,
+                        token: token,
+                        itemWidth: item.width,
+                        scale: scale,
+                        viewportHeight: viewport.height
+                    };
+
+                    console.log(
+                        "WX AIRPORT START:",
+                        currentWxAirport,
+                        "page:",
+                        pageNum
                     );
 
-                    octx.restore();
+                    continue;
+                }
+
+                //--------------------------------------------------
+                // ONLY ANALYSE TOKENS INSIDE AN AIRPORT WX SECTION
+                //--------------------------------------------------
+
+                if (currentWxAirport) {
+
+                    let badWx = false;
+
+                    //--------------------------------------------------
+                    // STORE EXACT KEYWORDS TO HIGHLIGHT
+                    //--------------------------------------------------
+
+                    const keywordsToHighlight = [];
+
+                    //--------------------------------------------------
+                    // 4 DIGIT VISIBILITY <= 3000
+                    // EXACT TOKEN AND MUST END IN 00
+                    //--------------------------------------------------
+                    const visibilityMatches = [
+                        ...token.matchAll(/(?:^|\s)(\d{2}00)(?=\s|$)/g)
+                    ];
+
+                    for (const match of visibilityMatches) {
+
+                        const visibility = match[1];
+
+                        if (parseInt(visibility, 10) <= 3000) {
+
+                            badWx = true;
+
+                            keywordsToHighlight.push(
+                                visibility
+                            );
+                        }
+                    }
+
+                    //--------------------------------------------------
+                    // G25 OR GREATER
+                    //--------------------------------------------------
+                    const gustMatches = [
+                        ...token.matchAll(/G(\d{2,3})(?=KT|\s|$)/g)
+                    ];
+
+                    for (const match of gustMatches) {
+
+                        const gust = parseInt(match[1], 10);
+
+                        if (gust >= 25) {
+
+                            badWx = true;
+
+                            keywordsToHighlight.push(
+                                match[0]
+                            );
+                        }
+                    }
+                    //--------------------------------------------------
+                    // TSRA
+                    //--------------------------------------------------
+
+                    const tsraMatches = [
+                        ...token.matchAll(/TSRA/g)
+                    ];
+
+                    for (const match of tsraMatches) {
+
+                        badWx = true;
+
+                        keywordsToHighlight.push("TSRA");
+                    }
+
+                    //--------------------------------------------------
+                    // SHRA
+                    //--------------------------------------------------
+
+                    const shraMatches = [
+                        ...token.matchAll(/SHRA/g)
+                    ];
+
+                    for (const match of shraMatches) {
+
+                        badWx = true;
+
+                        keywordsToHighlight.push("SHRA");
+                    }
+
+                    //--------------------------------------------------
+                    // +RA
+                    //--------------------------------------------------
+
+                    const plusRaMatches = [
+                        ...token.matchAll(/\+RA/g)
+                    ];
+
+                    for (const match of plusRaMatches) {
+
+                        badWx = true;
+
+                        keywordsToHighlight.push("+RA");
+                    }
+                    //--------------------------------------------------
+                    // HZ / FG / FU / DZ
+                    //--------------------------------------------------
+
+                    const standaloneWeatherCodes = [
+                        "HZ",
+                        "FG",
+                        "FU",
+                        "DZ"
+                    ];
+
+                    for (const code of standaloneWeatherCodes) {
+
+                        const regex =
+                            new RegExp(`\\b${code}\\b`);
+
+                        if (regex.test(token)) {
+
+                            badWx = true;
+
+                            keywordsToHighlight.push(code);
+                        }
+                    }
+
+                    //--------------------------------------------------
+                    // BAD WX FOUND
+                    //--------------------------------------------------
+
+                    if (badWx) {
+
+                        currentWxHasBad = true;
+
+                        console.log(
+                            "BAD WX:",
+                            currentWxAirport,
+                            token,
+                            keywordsToHighlight
+                        );
+
+                        //--------------------------------------------------
+                        // HIGHLIGHT ONLY BAD WX KEYWORDS
+                        //--------------------------------------------------
+
+                        const t = item.transform;
+
+                        const tx =
+                            t[4] * scale;
+
+                        const ty =
+                            viewport.height -
+                            (t[5] * scale);
+
+                        const charWidth =
+                            (item.width * scale) /
+                            token.length;
+
+                        octx.save();
+
+                        octx.fillStyle =
+                            "rgba(255, 235, 59, 0.5)";
+
+                        for (const keyword of keywordsToHighlight) {
+
+                            let startIndex =
+                                token.indexOf(keyword);
+
+                            while (startIndex !== -1) {
+
+                                const highlightX =
+                                    tx +
+                                    (startIndex * charWidth);
+
+                                octx.fillRect(
+                                    highlightX,
+                                    ty - 12,
+                                    charWidth * keyword.length,
+                                    18
+                                );
+
+                                badWxHighlights.push({
+                                    page: pageNum - 1,
+                                    x: highlightX,
+                                    y: ty - 12,
+                                    width: charWidth * keyword.length,
+                                    height: 18
+                                });
+
+                                startIndex =
+                                    token.indexOf(
+                                        keyword,
+                                        startIndex + keyword.length
+                                    );
+                            }
+                        }
+
+                        octx.restore();
+                    }
+                }
+            }
+
+            if (currentWxAirport && currentWxHasBad) {
+                if (!badWxAirports.includes(currentWxAirport)) {
+                    badWxAirports.push(currentWxAirport);
                 }
             }
 
@@ -6268,7 +7137,10 @@ for (let i = 0; i < pagesToRender.length; i++) {
               }
 
 
-            /// FORECAST WIND PAGE ANNOTATIONS   
+            // =====================================================
+            // FORECAST WIND PAGE ANNOTATIONS
+            // =====================================================
+
             const clbWaypointSet = new Set(
                 clbMatches
                     .map(c => c.waypointBefore)
@@ -6283,11 +7155,37 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                 const token = (item.str || "").trim().toUpperCase();
 
-                if (clbWaypointSet.has(token)) {
+                // =====================================================
+                // FIND WAYPOINT IN LEGS DATA
+                // =====================================================
 
-                    const climb = clbMatches.find(c => c.waypointBefore === token);
+                const waypointData =
+                    legsWaypointMatches.find(
+                        w => w.waypoint === token
+                    );
 
-                    if (!climb) continue; // or continue, depending on your loop structure
+                if (!waypointData) {
+                    continue;
+                }
+
+                const waypoint = waypointData.waypoint;
+                const flightLevel = waypointData.flightLevel;
+                const track = Number(waypointData.track);
+
+                if (!flightLevel || !Number.isFinite(track)) {
+                    continue;
+                }
+
+                // Is this waypoint part of the CLB schedule?
+                const isClbWaypoint =
+                    clbWaypointSet.has(waypoint);
+
+
+                // =====================================================
+                // HIGHLIGHT ONLY CLB WAYPOINTS
+                // =====================================================
+
+                if (isClbWaypoint) {
 
                     const t = item.transform;
 
@@ -6301,117 +7199,324 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     });
 
                     const tx = t[4] * scale;
-                    const ty = viewport.height - (t[5] * scale);
+                    const ty =
+                        viewport.height -
+                        (t[5] * scale);
 
                     octx.save();
-                    octx.fillStyle = "rgba(255,235,59,0.45)";
+
+                    octx.fillStyle =
+                        "rgba(255,235,59,0.45)";
+
                     octx.fillRect(
                         tx,
                         ty - 12,
                         item.width * scale,
                         18
                     );
+
                     octx.restore();
+                }
 
-                    // -------------------------
-                    // Search ahead for the forecast line
-                    // -------------------------
-                    for (let j = i + 1; j < Math.min(i + 5, items.length); j++) {
 
-                        const line = (items[j].str || "").trim();
+                // =====================================================
+                // SEARCH FORECAST LINE
+                // =====================================================
 
-                        const fields = line.split(/\s+/);
+                for (
+                    let j = i + 1;
+                    j < Math.min(i + 6, items.length);
+                    j++
+                ) {
 
-                        // Find the planned FL
-                        const idx = fields.indexOf(climb.code);
+                    const line =
+                        (items[j].str || "").trim();
 
-                        if (idx === -1) continue;
+                    const fields =
+                        line.split(/\s+/);
 
-                        // ============================
-                        // Wind Analysis
-                        // ============================
 
-                        // Planned wind (e.g. 25019)
-                        const plannedWind = fields[idx + 1];
+                    // =================================================
+                    // FIND CURRENT FL
+                    // =================================================
 
-                        const plannedDir = Number(plannedWind.slice(0, 3));
-                        const plannedSpd = Number(plannedWind.slice(3));
+                    const idx =
+                        fields.indexOf(flightLevel);
 
-                        // Lower level wind
-                        const lowerWind = fields[idx + 4];
+                    if (idx === -1) {
+                        continue;
+                    }
 
-                        const lowerDir = Number(lowerWind.slice(0, 3));
-                        const lowerSpd = Number(lowerWind.slice(3));
 
-                        // Aircraft track
-                        const track = Number(climb.track);
+                    // =================================================
+                    // CURRENT WIND
+                    // =================================================
 
-                        // Wind components
-                        const plannedComp = windComponent(
+                    const windToken =
+                        fields[idx + 1];
+
+                    if (!windToken) {
+                        continue;
+                    }
+
+                    if (!/^\d{5}$/.test(windToken)) {
+                        continue;
+                    }
+
+                    const windDir =
+                        Number(windToken.slice(0, 3));
+
+                    const windSpd =
+                        Number(windToken.slice(3));
+
+
+                    // =================================================
+                    // CURRENT WIND COMPONENT
+                    // =================================================
+
+                    const windComponentValue =
+                        windComponent(
                             track,
-                            plannedDir,
-                            plannedSpd
+                            windDir,
+                            windSpd
                         );
 
-                        const lowerComp = windComponent(
-                            track,
-                            lowerDir,
-                            lowerSpd
-                        );
 
-                        // Difference in headwind (+) / tailwind (-)
-                        const windPenalty = plannedComp - lowerComp;
+                    // =================================================
+                    // LEVEL ABOVE
+                    // =================================================
 
-                        let recommendation;
+                    let aboveFL = null;
+                    let aboveWind = null;
+                    let aboveComponent = null;
 
-                        if (windPenalty <= 0) {
+                    if (
+                        idx - 3 >= 0 &&
+                        /^\d{3}$/.test(fields[idx - 3] || "") &&
+                        /^\d{5}$/.test(fields[idx - 2] || "")
+                    ) {
 
-                            // Same or better wind at higher level
-                            const tailwindGain = Math.abs(windPenalty);
+                        aboveFL =
+                            fields[idx - 3];
 
-                            recommendation =
-                                `▲ CLB FL${climb.code} (+${tailwindGain.toFixed(1)}KT TW)`;
+                        aboveWind =
+                            fields[idx - 2];
+
+                        const aboveDir =
+                            Number(aboveWind.slice(0, 3));
+
+                        const aboveSpd =
+                            Number(aboveWind.slice(3));
+
+                        aboveComponent =
+                            windComponent(
+                                track,
+                                aboveDir,
+                                aboveSpd
+                            );
+                    }
+
+
+                    // =================================================
+                    // LEVEL BELOW
+                    // =================================================
+
+                    let belowFL = null;
+                    let belowWind = null;
+                    let belowComponent = null;
+
+                    if (
+                        idx + 3 < fields.length &&
+                        /^\d{3}$/.test(fields[idx + 3] || "") &&
+                        /^\d{5}$/.test(fields[idx + 4] || "")
+                    ) {
+
+                        belowFL =
+                            fields[idx + 3];
+
+                        belowWind =
+                            fields[idx + 4];
+
+                        const belowDir =
+                            Number(belowWind.slice(0, 3));
+
+                        const belowSpd =
+                            Number(belowWind.slice(3));
+
+                        belowComponent =
+                            windComponent(
+                                track,
+                                belowDir,
+                                belowSpd
+                            );
+                    }
+
+
+                    // =================================================
+                    // COMPARE LEVELS
+                    // =================================================
+
+                    const climbImprovement =
+                        aboveComponent !== null
+                            ? windComponentValue - aboveComponent
+                            : -Infinity;
+
+                    const descentImprovement =
+                        belowComponent !== null
+                            ? windComponentValue - belowComponent
+                            : -Infinity;
+
+
+                    // =================================================
+                    // HW / TW
+                    // =================================================
+
+                    let recommendation;
+                    let recommendationColor;
+
+                    const isStrongWind =
+                        Math.abs(windComponentValue) > 45;
+
+                    if (windComponentValue > 0) {
+
+                        // Headwind
+                        recommendation =
+                            `${windComponentValue.toFixed(1)}KT HW`;
+
+                        // HW <= 45 = yellow
+                        // HW > 45  = red
+                        recommendationColor =
+                            isStrongWind
+                                ? PDFLib.rgb(1, 0, 0)
+                                : PDFLib.rgb(1, 0.5, 0);
+
+                    }
+                    else if (windComponentValue < 0) {
+
+                        // Tailwind
+                        recommendation =
+                            `${Math.abs(windComponentValue).toFixed(1)}KT TW`;
+
+                        // TW <= 45 = green
+                        // TW > 45  = blue
+                        recommendationColor =
+                            isStrongWind
+                                ? PDFLib.rgb(0, 0, 1)
+                                : PDFLib.rgb(0, 0.6, 0);
+
+                    }
+                    else {
+
+                        recommendation =
+                            `0.0KT HW/TW`;
+
+                        recommendationColor =
+                            PDFLib.rgb(1, 0.75, 0);
+                    }
+
+
+                    // =================================================
+                    // CLB / DES RECOMMENDATION
+                    // =================================================
+
+                    let levelRecommendation = null;
+
+                    if (
+                        climbImprovement >= 15 &&
+                        climbImprovement >= descentImprovement
+                    ) {
+
+                        if (aboveComponent > 0) {
+
+                            // Above level still has headwind,
+                            // but it is lower than current level
+                            levelRecommendation =
+                                `CLB FL${aboveFL} -${climbImprovement.toFixed(1)}KT HW`;
 
                         }
-                        else if (windPenalty < 10) {
+                        else if (aboveComponent < 0) {
 
-                            // Small headwind increase
-                            recommendation = `▲ CLB FL${climb.code} (+${windPenalty.toFixed(1)}KT HW)`;
+                            // Above level provides more tailwind
+                            levelRecommendation =
+                                `CLB FL${aboveFL} +${climbImprovement.toFixed(1)}KT TW`;
 
                         }
                         else {
 
-                            // Large headwind penalty
-                            recommendation = `▼ STAY FL${fields[idx + 3]} (+${windPenalty.toFixed(1)}KT HW)`;
-
+                            levelRecommendation =
+                                `CLB FL${aboveFL} ${climbImprovement.toFixed(1)}KT`;
                         }
 
-                        const tf = items[j].transform;
+                    }
+                    else if (
+                        descentImprovement >= 15
+                    ) {
 
-                        const fx = tf[4] * scale;
-                        const fy = viewport.height - (tf[5] * scale);
+                        if (belowComponent > 0) {
 
-                        const charWidth = (items[j].width * scale) / line.length;
+                            // Lower level has less headwind
+                            levelRecommendation =
+                                `DES FL${belowFL} -${descentImprovement.toFixed(1)}KT HW`;
 
-                        // ============================
-                        // Highlight 1 : Planned FL + Wind
-                        // ============================
+                        }
+                        else if (belowComponent < 0) {
 
-                        const firstText = `${fields[idx]} ${fields[idx + 1]}`;
+                            // Lower level provides more tailwind
+                            levelRecommendation =
+                                `DES FL${belowFL} +${descentImprovement.toFixed(1)}KT TW`;
 
-                        const firstStart = line.indexOf(firstText);
+                        }
+                        else {
 
-                        const firstX = fx + (firstStart * charWidth);
-                        const firstWidth = firstText.length * charWidth;
+                            levelRecommendation =
+                                `DES FL${belowFL} ${descentImprovement.toFixed(1)}KT`;
+                        }
+                    }
+
+
+                    // =================================================
+                    // HIGHLIGHT FL + WIND
+                    // =================================================
+
+                    const tf = items[j].transform;
+
+                    const fx =
+                        tf[4] * scale;
+
+                    const fy =
+                        viewport.height -
+                        (tf[5] * scale);
+
+                    const charWidth =
+                        (items[j].width * scale) /
+                        line.length;
+
+                    const windText =
+                        `${fields[idx]} ${fields[idx + 1]}`;
+
+                    const windStart =
+                        line.indexOf(windText);
+
+                    const windX =
+                        fx +
+                        (windStart * charWidth);
+
+                    const windWidth =
+                        windText.length * charWidth;
+
+
+                    // Only highlight FL + wind for CLB waypoints
+                    if (isClbWaypoint) {
 
                         octx.save();
 
-                        octx.fillStyle = "rgba(255,235,59,0.45)";
+                        octx.fillStyle =
+                            "rgba(255,235,59,0.45)";
 
                         octx.fillRect(
-                            firstX,
+                            windX,
                             fy - 12,
-                            firstWidth,
+                            windWidth,
                             18
                         );
 
@@ -6419,116 +7524,113 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
                         forecastWaypointHighlights.push({
                             page: pageNum - 1,
-                            x: tf[4] + (firstStart * (items[j].width / line.length)),
+
+                            x:
+                                tf[4] +
+                                (
+                                    windStart *
+                                    (items[j].width / line.length)
+                                ),
+
                             y: tf[5],
-                            width: items[j].width * (firstText.length / line.length),
+
+                            width:
+                                items[j].width *
+                                (windText.length / line.length),
+
                             height: 18
                         });
+                    }
 
-                        // ============================
-                        // Highlight 2 : Next lower FL + Wind
-                        // ============================
 
-                        if (fields[idx + 3] && fields[idx + 4]) {
+                    // =================================================
+                    // RECOMMENDATION
+                    // =================================================
 
-                            const secondText = `${fields[idx + 3]} ${fields[idx + 4]}`;
+                    const recX =
+                        fx +
+                        (items[j].width * scale) +
+                        60;
 
-                            const secondStart = line.indexOf(secondText);
+                    octx.save();
 
-                            const secondX = fx + (secondStart * charWidth);
-                            const secondWidth = secondText.length * charWidth;
+                    octx.font = "10px Helvetica";
 
-                            octx.save();
-
-                            octx.fillStyle = "rgba(255,235,59,0.45)";
-
-                            octx.fillRect(
-                                secondX,
-                                fy - 12,
-                                secondWidth,
-                                18
+                    octx.fillStyle =
+                        windComponentValue > 0
+                            ? (
+                                isStrongWind
+                                    ? "red"
+                                    : "orange"
+                            )
+                            : (
+                                isStrongWind
+                                    ? "blue"
+                                    : "green"
                             );
 
-                            octx.restore();
+                    octx.fillText(
+                        recommendation,
+                        recX,
+                        fy
+                    );
 
-                            forecastWaypointHighlights.push({
-                                page: pageNum - 1,
-                                x: tf[4] + (secondStart * (items[j].width / line.length)),
-                                y: tf[5],
-                                width: items[j].width * (secondText.length / line.length),
-                                height: 18
-                            });
-                        }
 
-                        // ============================
-                        // Highlight Tropopause
-                        // ============================
+                    // =================================================
+                    // CLB / DES ANNOTATION
+                    // =================================================
 
-                        if (items[j + 2]) {
+                    if (levelRecommendation) {
 
-                            const tropItem = items[j + 2];
-                            const tt = tropItem.transform;
+                        const levelRecY =
+                            fy + 13;
 
-                            const tx = tt[4] * scale;
-                            const ty = viewport.height - (tt[5] * scale);
-
-                            octx.save();
-
-                            octx.fillStyle = "rgba(255,235,59,0.45)";
-
-                            octx.fillRect(
-                                tx,
-                                ty - 12,
-                                tropItem.width * scale,
-                                18
-                            );
-
-                            octx.restore();
-
-                            forecastWaypointHighlights.push({
-                                page: pageNum - 1,
-                                x: tt[4],
-                                y: tt[5],
-                                width: tropItem.width,
-                                height: 18
-                            });
-                        }
-
-                        // ============================
-                        // Recommendation annotation
-                        // ============================
-
-                        const recX = fx + (items[j].width * scale) + 60;
-
-                        octx.save();
+                        const levelRecX =
+                            recX + 55;
 
                         octx.font = "10px Helvetica";
-                        octx.fillStyle =
-                            recommendation.startsWith("▲")
-                                ? "green"
-                                : "red";
+                        octx.fillStyle = "blue";
 
                         octx.fillText(
-                            recommendation,
-                            recX,
-                            fy
+                            levelRecommendation,
+                            levelRecX,
+                            levelRecY
                         );
+                    }
 
-                        octx.restore();
+                    octx.restore();
+
+
+                    forecastRecommendationAnnotations.push({
+                        page: pageNum - 1,
+                        text: recommendation,
+                        x: tf[4] + items[j].width + 40,
+                        y: tf[5],
+                        color: recommendationColor
+                    });
+
+
+                    // =================================================
+                    // PDF CLB / DES ANNOTATION
+                    // =================================================
+
+                    if (levelRecommendation) {
 
                         forecastRecommendationAnnotations.push({
                             page: pageNum - 1,
-                            text: recommendation,
-                            x: tf[4] + items[j].width + 40,
-                            y: tf[5],
-                            color:
-                                recommendation.startsWith("▲")
-                                    ? PDFLib.rgb(0, 0.6, 0)
-                                    : PDFLib.rgb(1, 0, 0)
+                            text: levelRecommendation,
+                            x: tf[4] + items[j].width + 85,
+                            y: tf[5] - 10,
+                            color: PDFLib.rgb(0, 0, 1)
                         });
-
-                        break;
                     }
+
+
+                    console.log(
+                        `FORECAST WIND | ${waypoint} | FL${flightLevel} | TRK ${track} | WIND ${windToken} | ${windComponentValue.toFixed(1)}KT | ABOVE FL${aboveFL} ${aboveWind} ${aboveComponent !== null ? aboveComponent.toFixed(1) : "N/A"} | BELOW FL${belowFL} ${belowWind} ${belowComponent !== null ? belowComponent.toFixed(1) : "N/A"} | ${recommendation} | ${levelRecommendation || "NO LEVEL CHANGE"} | CLB: ${isClbWaypoint}`
+                    );
+
+                    break;
                 }
             }
             ///NEXT
@@ -7534,6 +8636,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             entries: [
                 { text: "LEGS", page: sidPage - 1 },
                 { text: "EDTO", page: edtoStartPage - 1 },
+                { text: "WINDS", page: forecastStartPage - 1 },
                 { text: "ATC FLT PLN", page: atcFlightPlanPage - 1 },
                 { text: "WEATHER", page: airportWxStartPage - 1 },
                 { text: "DEP NOTAMS", page: notamStartPage - 1 },
@@ -7564,7 +8667,30 @@ for (let i = 0; i < pagesToRender.length; i++) {
         }
     }
 
+    // -----------------------------------------
+    // BOTTOM OF PAGE ANNOTATION
+    // -----------------------------------------
+    if (pageNum === 1) {
+        bottomPageAnnotation = {
+            page: 0,
+            leftX: 65,
+            rightX: octx.canvas.width - 500,
+            y: octx.canvas.height - 40,
+            lineHeight: 25,
+            canvasHeight: octx.canvas.height
+        };
 
+        let bottomY = octx.canvas.height - 40;
+
+        octx.fillStyle = "blue";
+        octx.font = "12px Helvetica";
+
+        octx.fillText("I:", 65, bottomY);
+        octx.fillText("C:", 65, bottomY + 25);
+
+        octx.fillText("LS:", octx.canvas.width - 500, bottomY);
+        octx.fillText("LSS:", octx.canvas.width - 500, bottomY + 25);
+    }
 
 
 
@@ -8312,13 +9438,25 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 
     if (intamTitleAnnotation) {
 
-        const page = pdfPages[intamTitleAnnotation.page];
+        console.log("INTAM DEBUG:", {
+            annotation: intamTitleAnnotation,
+            pdfPagesLength: pdfPages?.length,
+            requestedPage: intamTitleAnnotation.page,
+            requestedPageObject: pdfPages?.[intamTitleAnnotation.page]
+        });
+
+        const page =
+            pdfPages[intamTitleAnnotation.page];
 
         page.drawText(
             intamTitleAnnotation.text,
             {
                 x: intamTitleAnnotation.x / scale,
-                y: (intamTitleAnnotation.canvasHeight - intamTitleAnnotation.y) / scale,
+                y:
+                    (
+                        intamTitleAnnotation.canvasHeight -
+                        intamTitleAnnotation.y
+                    ) / scale,
                 size: 24,
                 font: unicodeFont,
                 color: PDFLib.rgb(1, 0, 0)
@@ -8390,7 +9528,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
         });
     }
 
-
+    
 
 
 
@@ -8607,6 +9745,99 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 
             y -= tocAnnotation.lineHeight / scale;
         }
+    }
+
+    if (bottomPageAnnotation) {
+
+        const page = exportDoc.getPages()[0];
+
+        const xLeft =
+            bottomPageAnnotation.leftX / scale;
+
+        const xRight =
+            bottomPageAnnotation.rightX / scale;
+
+        let y =
+            (bottomPageAnnotation.canvasHeight -
+            bottomPageAnnotation.y) / scale;
+
+        const lineHeight =
+            bottomPageAnnotation.lineHeight / scale;
+
+        const blue =
+            PDFLib.rgb(0, 0, 1);
+
+
+        // -----------------------------------------
+        // LEFT SIDE
+        // -----------------------------------------
+
+        page.drawText("I:", {
+            x: xLeft,
+            y: y,
+            size: 8,
+            font: exportUnicodeFont,
+            color: blue
+        });
+
+        page.drawText("C:", {
+            x: xLeft,
+            y: y - lineHeight,
+            size: 8,
+            font: exportUnicodeFont,
+            color: blue
+        });
+
+
+        // -----------------------------------------
+        // RIGHT SIDE
+        // -----------------------------------------
+
+        page.drawText("LS:", {
+            x: xRight,
+            y: y,
+            size: 8,
+            font: exportUnicodeFont,
+            color: blue
+        });
+
+        page.drawText("LSS:", {
+            x: xRight,
+            y: y - lineHeight,
+            size: 8,
+            font: exportUnicodeFont,
+            color: blue
+        });
+    }
+
+    for (const h of badWxHighlights) {
+
+        const exportPageIndex = pageMap[h.page];
+
+        if (exportPageIndex === undefined)
+            continue;
+
+        const page =
+            exportDoc.getPages()[exportPageIndex];
+
+        const scale = 1.5;
+
+        page.drawRectangle({
+
+            x: h.x / scale,
+
+            y:
+                page.getHeight()
+                - ((h.y + h.height) / scale),
+
+            width: h.width / scale,
+
+            height: h.height / scale,
+
+            color: PDFLib.rgb(1, 0.92, 0.2),
+
+            opacity: 0.45
+        });
     }
 
     const bytes = await exportDoc.save();
