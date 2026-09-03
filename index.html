@@ -60,7 +60,7 @@ canvas.overlayCanvas {
 <body>
 
 <div class="header">
-    <h2>OFP Annotation Tool v2.1</h2>
+    <h2>OFP Annotation Tool v2.2</h2>
 </div>
 
 <div class="upload">
@@ -71,11 +71,20 @@ canvas.overlayCanvas {
 <div id="viewer"></div>
 
 <script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
 <script src="https://unpkg.com/pdf-lib/dist/pdf-lib.min.js"></script>
 <script src="https://unpkg.com/@pdf-lib/fontkit/dist/fontkit.umd.min.js"></script>
 
 <script>
+
+// Efficiency cache: fetch the shared font file only once per page session.
+let arialFontBytesPromise = null;
+function getArialFontBytes() {
+    if (!arialFontBytesPromise) {
+        arialFontBytesPromise = fetch("ARIAL.TTF")
+            .then(res => res.arrayBuffer());
+    }
+    return arialFontBytesPromise;
+}
 
 ///FIR DATABASE
 const FIR_DATA = [
@@ -1991,10 +2000,6 @@ fileInput.addEventListener("change", async (e) => {
         data: originalPdfBuffer.slice(0)
     }).promise;
 
-    const srcPdf = await PDFLib.PDFDocument.load(
-        originalPdfBuffer.slice(0)
-    );
-
     const scale = 1.5;
 
 
@@ -2009,6 +2014,7 @@ fileInput.addEventListener("change", async (e) => {
 
         const items = textContent.items;
         const tokens = items.map(i => (i.str || "").trim());
+        const upperTokens = tokens.map(token => token.toUpperCase());
         const text = tokens.join(" ");
         const upperText = text.toUpperCase();
 
@@ -2017,6 +2023,7 @@ fileInput.addEventListener("change", async (e) => {
             page,
             items,
             tokens,
+            upperTokens,
             text,
             upperText,
             viewport
@@ -4848,6 +4855,7 @@ async function findDecompressionProfiles(highGroundWaypoints, airways){
     const pdf = await pdfjsLib.getDocument(PDF_PATH).promise;
 
     const matches = [];
+    const highGroundWaypointSet = new Set(highGroundWaypoints);
 
 
     /// EXTRACT DECOMPRESSION PDF PAGES
@@ -4908,10 +4916,10 @@ async function findDecompressionProfiles(highGroundWaypoints, airways){
 
             /// 2. CHECK WHETHER EITHER END IS A HIGH GROUND WAYPOINT
             const startIsHighGround =
-                highGroundWaypoints.includes(startWaypoint);
+                highGroundWaypointSet.has(startWaypoint);
 
             const endIsHighGround =
-                highGroundWaypoints.includes(endWaypoint);
+                highGroundWaypointSet.has(endWaypoint);
 
             if(!startIsHighGround && !endIsHighGround)
                 continue;
@@ -7704,6 +7712,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
 
             lines.push("");
             lines.push("IFM BRIEF:");
+            lines.push("Taxi: S / N / L");
+            lines.push("PW:");
             lines.push("WX:");
 
             for (const range of vwsSummary) {
@@ -8630,7 +8640,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
         tocAnnotation = {
             page: 0,
             x: 5,
-            y: 1050,
+            y: 1040,
             lineHeight: 18,
             canvasHeight: octx.canvas.height,
             entries: [
@@ -8646,7 +8656,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ]
         };
 
-        let tocY = 1050;
+        let tocY = 1040;
 
         octx.fillStyle = "blue";
         octx.font = "12px Helvetica";
@@ -8730,8 +8740,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 
     const firstPage = pdfPages[0];
 
-    const fontBytes = await fetch("ARIAL.TTF")
-        .then(res => res.arrayBuffer());
+    const fontBytes = await getArialFontBytes();
 
     const unicodeFont = await pdfDoc.embedFont(fontBytes);
 
@@ -9540,8 +9549,7 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
 
     exportDoc.registerFontkit(fontkit);
 
-    const exportFontBytes = await fetch("ARIAL.TTF")
-        .then(res => res.arrayBuffer());
+    const exportFontBytes = await getArialFontBytes();
 
     const exportUnicodeFont = await exportDoc.embedFont(exportFontBytes);
 
