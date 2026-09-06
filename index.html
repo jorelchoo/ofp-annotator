@@ -1630,13 +1630,13 @@ function matchesGroup(text, group) {
 ///ANNOTATION DRAW FUNCTION
 function drawPdfText(page, text, x, y) {
 
-    const xOffset = -23;      // move left
-    const yOffset = 0;      // move down (adjust if needed)
-    const fontSize = 8;     // smaller text
+    // x/y are stored in the original PDF coordinate system.
+    // Do not apply a second canvas-style offset here.
+    const fontSize = 8;
 
     page.drawText(String(text), {
-        x: x + xOffset,
-        y: y + yOffset,
+        x,
+        y,
         size: fontSize,
         color: PDFLib.rgb(0, 0, 1)
     });
@@ -3261,7 +3261,6 @@ if (crewBulletinStartPage !== null) {
 }
 
 /// NOTAM EXTRA TIME THING (FINAL CLEAN VERSION)
-
 const page1Text = pages[0].text;
 
 // 1. Extract flight date EARLY (critical fix)
@@ -3303,7 +3302,6 @@ console.log("NOTAM BASE:", {
 
 
 /// NOTAM ANALYSIS FEATURE
-
 let airportType = null;
 let stopNotamExtraction = false;
 const ROW_TOLERANCE = 2; // pixels
@@ -6145,38 +6143,40 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     burnoffTime = burnTime;
                 }
             }
-        ///Burn-off
-        if (upper.includes("BURNOFF")) {
+            ///Burn-off
+            if (pageNum === 1) {
+                if (upper.includes("BURNOFF")) {
 
-            const valueItem = items[i + 4]; // 4 tokens after
+                    const valueItem = items[i + 4]; // 4 tokens after
 
-            if (!valueItem || !valueItem.str) continue;
+                    if (!valueItem || !valueItem.str) continue;
 
-            const converted = convertFuel(valueItem.str);
+                    const converted = convertFuel(valueItem.str);
 
-            if (converted === null) continue;
+                    if (converted === null) continue;
 
-            const t = valueItem.transform || item.transform;
+                    const t = valueItem.transform || item.transform;
 
-            burnoffAnnotation = {
-                page: pageNum - 1,
-                text: converted,
-                x: t[4] + 65,
-                y: t[5]
-            };
+                    const tx = t[4] * scale;
+                    const ty = viewport.height - (t[5] * scale);
 
-            const tx = t[4] * scale;
-            const ty = viewport.height - (t[5] * scale);
+                    burnoffAnnotation = {
+                        page: pageNum - 1,
+                        text: String(converted),
+                        x: tx + 65,
+                        y: ty,
+                        canvas: true
+                    };
 
-            octx.fillStyle = "blue";
-            octx.font = "12px Helvetica";
+                    octx.fillStyle = "blue";
+                    octx.font = "12px Helvetica";
 
-            octx.fillText(
-                converted,
-                tx + 65,
-                ty
-            );
-        }
+                    octx.fillText(
+                        converted,
+                        tx + 65,
+                        ty
+                    );
+                }
             ///Contingency
             if (pageNum === 1 && upper.includes("CONT")) {
                 const valueItem = items[i + 4];
@@ -6192,7 +6192,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                         contingencyAnnotation = {
                             page: 0,
                             text: converted,
-                            x: t[4] + 65,
+                            x: t[4] + (65 / scale),
                             y: t[5]
                         };
                         const tx = t[4] * scale;
@@ -6220,7 +6220,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 alternateFuelAnnotation = {
                     page: 0,
                     text: converted,
-                    x: t[4] + 65,
+                    x: t[4] + (65 / scale),
                     y: t[5]
                 };
 
@@ -6250,7 +6250,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 alternateHoldAnnotation = {
                     page: 0,
                     text: converted,
-                    x: t[4] + 65,
+                    x: t[4] + (65 / scale),
                     y: t[5]
                 };
 
@@ -6282,7 +6282,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     taxiFuelAnnotation = {
                         page: 0,
                         text: converted,
-                        x: t[4] + 65,
+                        x: t[4] + (65 / scale),
                         y: t[5]
                     };
 
@@ -6314,7 +6314,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 flightPlanRequirementAnnotation = {
                     page: 0,
                     text: converted,
-                    x: t[4] + 65,
+                    x: t[4] + (65 / scale),
                     y: t[5]
                 };
 
@@ -6346,7 +6346,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                         excessFuelAnnotation = {
                             page: 0,
                             text: converted,
-                            x: t[4] + 65,
+                            x: t[4] + (65 / scale),
                             y: t[5]
                         };
 
@@ -6376,7 +6376,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 fuelInTanksAnnotation = {
                     page: 0,
                     text: converted,
-                    x: t[4] + 65,
+                    x: t[4] + (65 / scale),
                     y: t[5]
                 };
 
@@ -6425,21 +6425,42 @@ for (let i = 0; i < pagesToRender.length; i++) {
             ///ALTN AIRPORT
             if (upper.startsWith("ALTN")) {
 
-                const token = items[i].str || "";
+                // PDF.js can split "ALTN XXX (YYYY)" into several text items.
+                // Search the nearby tokens instead of requiring the parentheses
+                // to be present in items[i].str.
+                const nearbyTokens = items
+                    .slice(i, Math.min(i + 6, items.length))
+                    .map(it => (it.str || "").trim())
+                    .filter(Boolean);
 
-                // match ALTN XXX (YYYY)
-                const match = token.match(/\(([^)]+)\)/);
+                const nearbyText = nearbyTokens.join(" ");
 
-                if (match && match[1]) {
+                let airportMatch =
+                    nearbyText.match(/\(([A-Z0-9]{3,5})\)/i);
 
-                    altnAirport = match[1];
+                // Fallback for PDFs where the bracketed airport code is split
+                // into separate tokens or omitted.
+                if (!airportMatch) {
+                    for (let j = 1; j < nearbyTokens.length; j++) {
+                        const candidate =
+                            nearbyTokens[j].replace(/[^A-Z0-9]/gi, "").toUpperCase();
+
+                        if (/^[A-Z]{4}$/.test(candidate)) {
+                            airportMatch = [candidate, candidate];
+                            break;
+                        }
+                    }
+                }
+
+                if (airportMatch && airportMatch[1]) {
+
+                    altnAirport = airportMatch[1].toUpperCase();
 
                     const t = item.transform;
 
                     altnAirportPos = {
                         tx: t[4] * scale,
                         ty: viewport.height - (t[5] * scale),
-
                         pdfX: t[4],
                         pdfY: t[5]
                     };
@@ -6480,8 +6501,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 landingFuelAnnotation = {
                     page: 0,
                     text: `LDG FUEL: ${ldgFuel}`,
-                    x: t[4] + 22,
-                    y: t[5] - 13
+                    // Preview: tx, ty + 20 -> PDF coordinates:
+                    x: t[4],
+                    y: t[5] - (20 / scale)
                 };
 
                 const tx = t[4] * scale;
@@ -6517,8 +6539,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 pzfwAnnotation = {
                     page: 0,
                     text: converted,
-                    x: t[4] + 93,
-                    y: t[5]
+                    // Preview: tx + 110, ty + 1.
+                    x: t[4] + (110 / scale),
+                    y: t[5] - (1 / scale)
                 };
 
                 const tx = t[4] * scale;
@@ -6553,8 +6576,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 ptowAnnotation = {
                     page: 0,
                     text: converted,
-                    x: t[4] + 93,
-                    y: t[5]
+                    x: t[4] + (110 / scale),
+                    y: t[5] - (1 / scale)
                 };
 
                 const tx = t[4] * scale;
@@ -6588,8 +6611,8 @@ for (let i = 0; i < pagesToRender.length; i++) {
                 plwtAnnotation = {
                     page: 0,
                     text: converted,
-                    x: t[4] + 93,
-                    y: t[5]
+                    x: t[4] + (110 / scale),
+                    y: t[5] - (1 / scale)
                 };
 
                 const tx = t[4] * scale;
@@ -6604,8 +6627,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     rtowAnnotation = {
                         page: 0,
                         text: `RTOW ${rtow}`,
-                        x: t[4] + 66,
-                        y: t[5] - 11
+                        // Preview: tx + 71, ty + 18.
+                        x: t[4] + (71 / scale),
+                        y: t[5] - (18 / scale)
                     };
 
                     octx.fillStyle = "blue";
@@ -6625,8 +6649,9 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     excessAnnotation = {
                         page: 0,
                         text: `EXCESS ${excess}`,
-                        x: t[4] + 58,
-                        y: t[5] - 21
+                        // Preview: tx + 62, ty + 32.
+                        x: t[4] + (62 / scale),
+                        y: t[5] - (32 / scale)
                     };
 
                     octx.fillStyle = "blue";
@@ -6639,6 +6664,7 @@ for (let i = 0; i < pagesToRender.length; i++) {
                     );
                 }
             }
+        }
             ///BURN ADD/LESS
                 if (upper.includes("BURN ADD") || upper.includes("BURN LESS")) {
 
@@ -8821,11 +8847,18 @@ document.getElementById("downloadBtn").addEventListener("click", async () => {
     }
 
     if (burnoffAnnotation) {
-        drawPdfText(
-            pdfPages[burnoffAnnotation.page],
+
+        const page = pdfPages[burnoffAnnotation.page];
+
+        page.drawText(
             burnoffAnnotation.text,
-            burnoffAnnotation.x,
-            burnoffAnnotation.y
+            {
+                x: burnoffAnnotation.x / 1.5,
+                y: page.getHeight() - (burnoffAnnotation.y / 1.5),
+                size: 8,
+                font: unicodeFont,
+                color: PDFLib.rgb(0, 0, 1)
+            }
         );
     }
 
